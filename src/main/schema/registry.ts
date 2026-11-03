@@ -1,9 +1,18 @@
 /**
- * Schema 注册表：`Map<typeId, RecipeTypeSchema>` + 五层合并（规格 3.6.3 / 3.6.14 优先级）。
+ * Schema 注册表：`Map<typeId, RecipeTypeSchema>` + 层合并（规格 3.6.3 / 3.6.14 优先级）。
  *
- *   用户钉住（customTypesFile）> 插件 > L0 内置库 > L2 jar/ProbeJS > L1 反推
+ *   用户钉住（customTypesFile）> 插件 > builtin（试点 3 类型）> jar/ProbeJS > 反推
  *
- * 合并**不是后者覆盖前者**：以最高优先层为骨架，L1 只做字段校验与补全 ——
+ * **接线现状（P3-1/3-2/3-3，2026-11-04 复核，勿凭本注释臆断运行时能力）**：
+ * - 上式是设计目标优先级；当前**实际有数据源的只有三层**：pinned（schema:pin 落盘）、
+ *   plugin（插件通道）、builtin（`service.ts` 用 PILOT_SCHEMAS 3 类型填充）。
+ * - 「L0 内置库」（`src/data/recipeTypes/`，672 行）当前**未接线、零引用**，不产出数据；
+ * - jar/ProbeJS 层与反推层当前也无生产写入方（无 putLayer/putMany 调用），
+ *   schemaValidate.ts / schemaMigrate.ts 同样生产零引用；
+ * - 渲染层通用 schema 编辑器（layouts/controls/panels 大部分文件）未挂载，
+ *   运行时只有试点三件套 + 通用兜底。详见 README「已实现 / 已接线 / 预留未接线」。
+ *
+ * 合并**不是后者覆盖前者**：以最高优先层为骨架，低优先层只做字段校验与补全 ——
  * 出现率 ≥10% 而骨架没有的字段追加为可选并标「整合包实测字段」；骨架有而样本里
  * 从未出现的字段降级进 `extraFields`（高级区）。每个 schema 全程携带 source 与 sampleCount。
  * 绝不按模组写专属分支：层与层之间只按 typeId 对齐。
