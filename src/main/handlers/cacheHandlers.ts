@@ -13,6 +13,7 @@ import { lstat, readdir, unlink } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import { app } from 'electron'
 import { registerHandler } from '../ipcRegistry'
+import { isScanning } from '../scanOrchestrator'
 import { logger } from '../logger'
 
 const BATCH = 32
@@ -153,6 +154,14 @@ export async function clearCache(
   rootIn?: string,
   onProgress?: (p: { kind: CacheKind; done: number; total: number }) => void
 ): Promise<ClearResult> {
+  // P3-16：铁律第 5 条的后端落地——扫描进行中拒绝清理（UI 禁用之外的第二道保险，
+  // 防止绕过 UI 的 IPC 直调清掉正在写出的缓存）。
+  if (isScanning()) {
+    const err = new Error('扫描进行中，暂不能清理缓存；请等扫描完成后再试') as Error & { code: string }
+    err.name = 'SCAN_IN_PROGRESS'
+    err.code = 'SCAN_IN_PROGRESS'
+    throw err
+  }
   if (running) throw new Error('已有清理任务在进行')
   running = true
   const root = rootIn ?? userData()
