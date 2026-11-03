@@ -219,16 +219,32 @@ async function listJars(modsDir: string): Promise<string[]> {
     .map((name) => join(modsDir, name))
 }
 
+/**
+ * P3-9：items.json 内容校验（导出仅供测试）。
+ * 数组内任一元素不满足 ItemEntry 形态即整体判 null（调用方据此重扫）；
+ * 旧实现逐元素 filter 会把 `[1,2,3]` 静默吞成「合法空缓存」（cacheHit=true、0 物品不重扫）。
+ * 空数组是合法缓存（空包真实态）。
+ */
+export function parseItemsCacheJson(raw: string): ItemEntry[] | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  if (!Array.isArray(parsed)) return null
+  const items = parsed as unknown[]
+  const allValid = items.every((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return false
+    const rec = item as Record<string, unknown>
+    return typeof rec['id'] === 'string' && typeof rec['nameZh'] === 'string'
+  })
+  return allValid ? (items as ItemEntry[]) : null
+}
+
 async function readItemsCache(path: string): Promise<ItemEntry[] | null> {
   try {
-    const raw = await fsp.readFile(path, 'utf8')
-    const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) return null
-    return parsed.filter((item): item is ItemEntry => {
-      if (!item || typeof item !== 'object') return false
-      const rec = item as Record<string, unknown>
-      return typeof rec['id'] === 'string' && typeof rec['nameZh'] === 'string'
-    })
+    return parseItemsCacheJson(await fsp.readFile(path, 'utf8'))
   } catch (err) {
     logger.warn('INDEX', `items.json 读取失败，将重新扫描`, err instanceof Error ? err.message : String(err))
     return null
