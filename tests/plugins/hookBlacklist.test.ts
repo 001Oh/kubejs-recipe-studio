@@ -121,8 +121,11 @@ describe('RV1-005 / RV1-006：正则字面量与嵌套模板', () => {
     expect(inspectHookSource(source)).toEqual([])
   })
 
-  it('语法非法的源码回退到字符扫描，且不抛错', () => {
-    const source = 'module.exports = function ( { return 1'
+  it('语法非法的源码回退到字符扫描：黑名单词仍被拦下且不抛错（P3-18 替换原「仅断言不抛错」的弱用例）', () => {
+    // 原用例只断言 not.toThrow()，没有验证「回退到字符扫描」本身——名为回退、实为空断言。
+    // 等价增强：非法语法 + 真实逃逸件，回退路径必须仍能拦下 require。
+    const source = 'module.exports = function ( { return require("fs").readFileSync("x") }'
     expect(() => inspectHookSource(source)).not.toThrow()
+    expect(inspectHookSource(source)).toContain('require')
   })
 })
