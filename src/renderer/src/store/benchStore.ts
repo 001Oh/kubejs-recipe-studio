@@ -386,6 +386,13 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
     if (!pending || !draft) return
     const loaded = normalizedToDraft(pending)
     if (!loaded) return
+    // P2-4：换基线可能连 schema 一起换（外部改动改变了槽位结构）。dirtyFields 必须
+    // 按新 normalized 槽位重算——否则脏键指向不存在的槽、基线已换新、提交畅通，
+    // 写入内容与 UI 意图静默偏离。失效的键丢弃并向用户点名。
+    const validKeys = new Set(loaded.normalized.slots.map((s) => s.key))
+    if (validKeys.has('result')) validKeys.add(BENCH_OUTPUTS_KEY) // UI 产物列表键 → result 别名
+    const kept = draft.meta.dirtyFields.filter((k) => validKeys.has(k))
+    const dropped = draft.meta.dirtyFields.filter((k) => !validKeys.has(k))
     // 保留当前编辑值，但把基线换成新原始；未知字段以新原文为准
     set({
       draftConflict: null,
@@ -397,10 +404,16 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
         ...(loaded.unsafeReason ? { unsafeReason: loaded.unsafeReason } : {}),
         passThrough: loaded.passThrough,
         banners: loaded.banners,
-        meta: loaded.meta.base ? { ...draft.meta, base: loaded.meta.base } : draft.meta
+        meta: loaded.meta.base ? { ...draft.meta, base: loaded.meta.base, dirtyFields: kept } : { ...draft.meta, dirtyFields: kept }
       }
     })
-    useAppStore.getState().toast('已保留你的修改，基线更新为最新原始数据', 'warn')
+    if (dropped.length > 0) {
+      useAppStore
+        .getState()
+        .toast(`已保留你的修改，基线已更新；${dropped.length} 个字段因结构变更已失效（${dropped.join('、')}），请重新确认`, 'warn')
+    } else {
+      useAppStore.getState().toast('已保留你的修改，基线更新为最新原始数据', 'warn')
+    }
   },
 
   resolveConflictSaveCopy() {
