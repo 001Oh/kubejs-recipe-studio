@@ -202,12 +202,21 @@ export function decideChannel(input: ChannelInput): ChannelDecision {
     )
   }
 
-  // 自动档（规格 3.6.10 判定顺序：语法糖 → 数据包 JSON → event.custom）
+  // 自动档口径（P3-7，2026-11-04 复核后按设计保留，勿当 bug 改顺序）：
+  // 实际顺序是「语法糖 → 附属缺失/无糖时数据包 JSON → 其余情况 event.custom」，
+  // 与规格 3.6.10 字面的「糖 → 数据包 → custom」不同。**有意为之**：
+  // 1) 自动档要的是最不容易出错的默认——附属已装但语法糖表达不全时走 event.custom，
+  //    脚本加载期把 JSON 直接交给对应 serializer，类型注册了就一定生效；数据包 JSON
+  //    依赖数据包加载阶段的解析、还可能被 forge 条件过滤，静默失效比报错更难排查。
+  // 2) 选择权没有被剥夺：WriteDialog 通道下拉里本就有「数据包 · 原生 JSON」，
+  //    需要声明式产物的用户手动选一次即可。自动档保守、手动档开放。
+  // 3) 改这个顺序会改变同一草稿的产出通道与格式（0.1.10 与 0.1.11 写出不同文件），
+  //    属发布级行为变更，必须独立版本 + release note + 用例锁死，不得夹进修 bug 的 patch。
   if (emitTarget && installed && unsupportedFields.length === 0) {
     return finish('kubejs-sugar', unsupportedFields, null, unverified, notes, null)
   }
   if (emitTarget && installed && unsupportedFields.length > 0) {
-    // 附属装了但糖表达不全 → event.custom（保留全部参数，绝不静默丢参数）
+    // 附属装了但糖表达不全 → event.custom（保留全部参数，绝不静默丢参数；见上方口径说明）
     return finish('event-custom', unsupportedFields, null, unverified, notes, null)
   }
   if (input.hasSamples && !input.requiresScript && !removalOnly) {
