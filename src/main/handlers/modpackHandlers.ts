@@ -9,6 +9,7 @@ import { buildIndex } from '../recipes/recipeIndex'
 import { resetPluginLoader } from '../plugins/loader'
 import { clearSchemas, invalidateSnapshot } from '../schema/registry'
 import { ensureSchemas } from '../schema/service'
+import { clearSession } from '../codegen/dedupe'
 import { getUiState, patchUiState, saveUiState } from '../uiStateStore'
 import { logger } from '../logger'
 
@@ -20,7 +21,11 @@ export function registerModpackHandlers(): void {
       logger.error('MODPACK', error)
       throw new Error(error)
     }
-    return importModpack(path)
+    const result = await importModpack(path)
+    // P3-4：会话去重记录按包计（dedupe 签名不含包身份），导入成功即作废上一包的记录，
+    // 否则换包后 findDuplicate 会对新包误报「与已生成的配方重复」。多候选选择不在此列。
+    if ('info' in result) clearSession()
+    return result
   })
 
   registerHandler('modpack:current', () => ({
@@ -48,8 +53,10 @@ export function registerModpackHandlers(): void {
     try {
       setCurrentModpack(null)
       setCurrentSummary(null)
+      // P3-4：卸载后本会话的「已生成配方」记录全部作废（包都没了，留着必然误报）
+      clearSession()
       cleared.modpack = true
-      steps.push('清包状态')
+      steps.push('清包状态与会话去重')
     } catch (err) {
       logger.warn('MODPACK', '卸载：清包状态失败', String(err))
     }

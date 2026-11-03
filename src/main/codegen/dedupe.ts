@@ -111,12 +111,15 @@ interface SessionEntry {
 }
 
 const session: SessionEntry[] = []
+/** P3-4：会话去重上界。超长会话/多次换包下 `session` 原先无界增长；超出后丢弃最早的记录。 */
+const SESSION_MAX = 200
 
 /** 记住一次成功生成（写盘后调用）；label 用文件名或配方 ID */
 export function rememberGeneration(workbench: WorkbenchState, label: string): void {
   const strict = signatureOf(workbench, false)
   if (session.some((entry) => entry.strict === strict && entry.label === label)) return
   session.push({ strict, flipped: signatureOf(workbench, true), label, at: Date.now() })
+  if (session.length > SESSION_MAX) session.splice(0, session.length - SESSION_MAX)
 }
 
 /** 与本次会话已生成的配方结构重复（含压印器翻转等价）时返回命中标识 */
