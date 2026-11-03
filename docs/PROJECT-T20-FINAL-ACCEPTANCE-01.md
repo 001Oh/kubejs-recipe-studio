@@ -312,7 +312,7 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | **0.1.3**（`package.json`，无 `productName`） |
+| 版本 | **0.1.3**（`package.json`，无 `productName` 键；`electron-builder.yml:2` 已设，不影响 userData） |
 | 安装包 | `dist-013/KubeJS Recipe Studio Setup 0.1.3.exe`，**82,372,678 B** |
 | **SHA-256** | **`c4134a15507cef701f3c3c236740d4558168d8c5d7c98e74a688cc105df532b0`** |
 | blockmap | `…exe.blockmap`，86,260 B，`fb60b3de94bead0b192d98ee63bd849f8485b571967f007ad5c3b021e37ac757` |
@@ -380,7 +380,7 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | **0.1.7**（`package.json`，无 `productName`） |
+| 版本 | **0.1.7**（`package.json`，无 `productName` 键；`electron-builder.yml:2` 已设，不影响 userData） |
 | 安装包 | `dist-017/KubeJS Recipe Studio Setup 0.1.7.exe`，**82,374,606 B** |
 | **SHA-256** | **`4ba139084c7dcba5cea30d4bee674bab27f9c8669ef4c01ea80949ebb999d9f4`** |
 | blockmap | 86,480 B，`03c0006ab562d7adaa004b9b3a8b23096d36653a75c9bc87cdbfba88e2b101af` |
@@ -413,7 +413,7 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | **0.1.8**（`package.json`，无 `productName`） |
+| 版本 | **0.1.8**（`package.json`，无 `productName` 键；`electron-builder.yml:2` 已设，不影响 userData） |
 | 安装包 | `dist-018/KubeJS Recipe Studio Setup 0.1.8.exe`，**82,374,671 B** |
 | **SHA-256** | **`5d3136b38e7d2416fd989b1e1c0013c6f0ff1a63a0b6c91feb905cf1896c6a44`** |
 | blockmap | `399e6f2eaa3d9793eaa25ec05ecf4639b15e9c3911f2a7da62b74ef16a030808` |
@@ -454,7 +454,7 @@
 
 | 项 | 值 |
 |---|---|
-| 版本（三处一致） | 源码 / `dist-0110` / 已安装 = **0.1.10**，无 `productName` |
+| 版本（三处一致） | 源码 / `dist-0110` / 已安装 = **0.1.10**；`package.json` 无 `productName` 键（`electron-builder.yml:2` 已设，不影响 userData） |
 | 安装包 | `dist-0110/KubeJS Recipe Studio Setup 0.1.10.exe` · **82,375,390 B** |
 | SHA-256 | `f94900cecaeaa54650e5d28dce3f5d3bc6840fd445c878aeb2dd51b382df3816` |
 | 门禁 | typecheck 0 / lint 0 / **853 用例 0 失败** / build 0 / NSIS exit 0 |

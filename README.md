@@ -44,6 +44,30 @@ Electron 二进制下载走国内镜像时加 `export ELECTRON_MIRROR="https://n
 确实存在无法添加的配方类型——模组在 Java 里硬编码、没有注册 `RecipeType` 的（如 Mekanism 的 Boiler、SPS），
 程序如实标注到具体 recipe type 并给出替代方案，不做笼统的「该模组不支持」结论。
 
+## 已实现 / 已接线 / 预留未接线
+
+以下三态表基于 0.1.11 的逐文件引用复核（2026-11-04 第三方审计 P3-1/2/3/11/20 复核结论），
+用于区分「运行时真实存在的能力」与「代码在库但未接入数据流的能力」：
+
+| 状态 | 模块 | 说明 |
+|---|---|---|
+| 已接线 | 试点三类型（`minecraft:crafting_shaped/shapeless`、`create:mixing`）+ 通用兜底 | `PILOT_SCHEMAS` 是 builtin 层唯一数据源（`schema/service.ts`） |
+| 已接线 | schema 钉住（pin）与插件层 | `customRecipeTypes.json` + 插件通道，含三态失败语义 |
+| 已接线 | `views/bench/panels/WriteDialog.tsx`、`controls/useSlotBinding.ts`、`overlays/{anchor,CountEditor,ItemPicker}` | 由 `BenchView` / 试点编辑器挂载 |
+| 已接线 | `scanSession` 的 `recordIcon` / `startScanSession` / `endScanSession` | 扫描编排使用 |
+| 预留未接线 | `src/data/recipeTypes/`（6 文件，672 行） | 「L0 内置类型库」无任何生产引用，不产出数据 |
+| 预留未接线 | `src/shared/schemaValidate.ts`（225 行） | 引用/数量/概率诊断层，仅 tests 引用；钉住校验在 schemaHandlers 另有实现 |
+| 预留未接线 | `src/shared/schemaMigrate.ts`（127 行） | 迁移层未接线；customRecipeTypes.json 走 loadPinned 直读路径 |
+| 预留未接线 | `scanSession` 的 `cleanupScanSession` / `recordCacheFile` | 「取消时清理」未接线（取消路径按 A 方案保留产物），能力供缓存管理复用 |
+| 预留未接线 | `views/bench/layouts/`（6 文件：BenchLayout、ShapedGrid、ZoneBoard、CustomGrid、SequenceEditor、ZoneShell） | 通用 schema 编辑器布局层 |
+| 预留未接线 | `views/bench/controls/`（9 文件：ComplexControls、controlProps、FieldControl、FieldShell、ItemControls、KeyValueEditor、RefControls、RegistryControl、ScalarControls） | 通用控件层（useSlotBinding 已接线，见上） |
+| 预留未接线 | `views/bench/panels/`（7 文件：AdvancedPanel、BenchHead、JsonEditor、KeyValueEditor、RequirementsBar、SecondaryPanel、TypeSelect） | 通用面板层（WriteDialog 已接线，见上） |
+| 预留未接线 | `views/bench/overlays/RegistryPicker.tsx`、`views/bench/{jsonModel,useElementWidth,valueAccess}.ts` | 注册表选择器与 bench 辅助函数，运行时不可达 |
+
+> 维护提示：上述「预留未接线」文件**保留在库中是有意决策**（接入时直接复用，避免重写），
+> 阅读架构注释时以本表为准——`registry.ts` / `merge.ts` 头注释里的层优先级是设计目标，
+> 当前实际生效的数据源只有钉住 / 插件 / 内置试点 3 类型。
+
 ## 已知取舍
 
 - 视图切换用 `Ctrl+Tab`（规格 3.9.9 同时要求裸 `Tab` 遍历焦点与切换视图，二者互斥，取可访问性优先）。

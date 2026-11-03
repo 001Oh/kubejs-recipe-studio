@@ -24,7 +24,7 @@
 |---|---|---|---|
 | F1 | 源码版本 | `package.json.version = 0.1.1` | 版本唯一真源 |
 | F2 | `package.json.name` | `kubejs-recipe-studio` | drill 的包身份断言依赖此值 |
-| F3 | `productName` | **未设置（正确）** | 一旦设置会让 `app.getName()` 变 → userData 目录名变 → 历史数据「看起来全丢」 |
+| F3 | `productName` | **`package.json` 未设置（正确）；`electron-builder.yml:2` 已设 `KubeJS Recipe Studio`** | 一旦 `package.json` 设了 productName 会让 `app.getName()` 变 → userData 目录名变 → 历史数据「看起来全丢」；electron-builder.yml 的 productName 只影响安装器/快捷方式名称，打包不回写 `package.json`，`app.getName()` 与 userData 目录名不受影响（0.1.11 口径更正，第三方审计 P3-19） |
 | F4 | `appId` | `com.kubejs.recipestudio` | NSIS 卸载键 GUID 只由 `appId` 决定 |
 | F5 | 产物目录 | `dist/`、`dist-011/` **均存在** | 不得清理（本批硬边界） |
 | F6 | 已安装版本 | **0.1.0**（据 V9 与既往报告） | ⚠ 与源码 0.1.1 **错位** |
@@ -80,7 +80,7 @@
 | # | 检查 | 判据 | 状态 |
 |---|---|---|---|
 | B1 | 版本号已定且唯一 | `package.json.version` == lockfile 两处 == Release Notes | **BLOCKED（T-17）** |
-| B2 | `productName` **未设置** | `package.json` 无该键 | 可执行 |
+| B2 | `package.json` **无 `productName` 键**（`electron-builder.yml:2` 有，不影响 userData：打包不回写 `package.json`） | `package.json` 无该键 | 可执行 |
 | B3 | 门禁全绿 | `typecheck` / `lint --max-warnings=0` / `build` / `test` 全 0 | 可执行（但本机 `test` 受环境策略影响，见 §5） |
 | B4 | 工作区干净 | 无未备案的 `src`/`tests` 改动（用文件时间戳 + 哈希） | 可执行 |
 | B5 | 打包镜像变量已设 | `ELECTRON_BUILDER_BINARIES_MIRROR=https://hk.gh-proxy.com/https://github.com/electron-userland/electron-builder-binaries/releases/download/` | 可执行 |
@@ -101,7 +101,7 @@
 | D1 | 覆盖安装保留用户数据 | 卸载参数含 `/KEEP_APP_DATA` 与 `--updated` |
 | D2 | **`/S` 不自动启动** | 安装完成后**不得**出现应用进程；**绝不能加 `--force-run`**（会用默认 userData 写生产数据） |
 | D3 | 卸载不清 userData | 卸载后 `%APPDATA%\kubejs-recipe-studio` 仍在 |
-| D4 | 升级不产生第二份 userData | 目录名不变（依赖 B2：无 `productName`） |
+| D4 | 升级不产生第二份 userData | 目录名不变（依赖 B2：`package.json` 无 `productName` 键；electron-builder.yml 的 productName 不参与 userData 命名） |
 
 ### 3.4 发布
 
@@ -221,7 +221,7 @@ sha256sum "KubeJS Recipe Studio Setup 0.1.1.exe"
 
 | 项 | 值 |
 |---|---|
-| 源码版本（唯一真源） | **0.1.3**（`package.json.version`；**无 `productName`**，userData 目录名不受影响） |
+| 源码版本（唯一真源） | **0.1.3**（`package.json.version`；**`package.json` 无 `productName` 键**，userData 目录名不受影响） |
 | 安装包 | `dist-013/KubeJS Recipe Studio Setup 0.1.3.exe` |
 | 大小 | **82,372,678 B** |
 | **SHA-256** | **`c4134a15507cef701f3c3c236740d4558168d8c5d7c98e74a688cc105df532b0`** |
@@ -264,7 +264,7 @@ sha256sum "dist-013/KubeJS Recipe Studio Setup 0.1.3.exe"
 
 | 项 | 值 |
 |---|---|
-| 源码版本（唯一真源） | **0.1.6**（`package.json.version`；**无 `productName`**） |
+| 源码版本（唯一真源） | **0.1.6**（`package.json.version`；**`package.json` 无 `productName` 键**） |
 | 安装包 | `dist-016/KubeJS Recipe Studio Setup 0.1.6.exe` |
 | 大小 | **82,373,184 B** |
 | **SHA-256** | **`bb84e247bd2b97765fa514759ab0562e7f7d0a699c48a310ddf1ea333568e180`** |
@@ -316,7 +316,7 @@ sha256sum "dist-016/KubeJS Recipe Studio Setup 0.1.6.exe"
 
 | 项 | 值 |
 |---|---|
-| 源码版本（唯一真源） | **0.1.7**（`package.json.version`；**无 `productName`**，userData 目录名不受影响） |
+| 源码版本（唯一真源） | **0.1.7**（`package.json.version`；**`package.json` 无 `productName` 键**，userData 目录名不受影响） |
 | 安装包 | `dist-017/KubeJS Recipe Studio Setup 0.1.7.exe` |
 | 大小 | **82,374,606 B** |
 | **SHA-256** | **`4ba139084c7dcba5cea30d4bee674bab27f9c8669ef4c01ea80949ebb999d9f4`** |
@@ -380,7 +380,7 @@ sha256sum "dist-017/KubeJS Recipe Studio Setup 0.1.7.exe"
 
 | 项 | 值 |
 |---|---|
-| 源码版本（唯一真源） | **0.1.8**（无 `productName`） |
+| 源码版本（唯一真源） | **0.1.8**（`package.json` 无 `productName` 键；`electron-builder.yml:2` 已设，不影响 userData） |
 | 安装包 | `dist-018/KubeJS Recipe Studio Setup 0.1.8.exe`，**82,374,671 B** |
 | **SHA-256** | **`5d3136b38e7d2416fd989b1e1c0013c6f0ff1a63a0b6c91feb905cf1896c6a44`** |
 | blockmap | `399e6f2eaa3d9793eaa25ec05ecf4639b15e9c3911f2a7da62b74ef16a030808` |
@@ -411,7 +411,7 @@ U-18（create 无查重）、U-21 的 A 方案只显示 JSON 不显示代码、U
 
 | 项 | 值 |
 |---|---|
-| 版本 | **0.1.9**（无 `productName`） |
+| 版本 | **0.1.9**（`package.json` 无 `productName` 键；`electron-builder.yml:2` 已设，不影响 userData） |
 | 安装包 | `dist-019/KubeJS Recipe Studio Setup 0.1.9.exe`，**82,375,272 B** |
 | **SHA-256** | **`b5dbb6427b5b108f247a72514345690de12b7b7b7fc4a108fd54aeec690189aa`** |
 | 门禁 | typecheck 0 / lint 0 / **853 passed** / build 0 / NSIS 0 |
@@ -425,7 +425,7 @@ U-18（create 无查重）、U-21 的 A 方案只显示 JSON 不显示代码、U
 
 | 项 | 值 |
 |---|---|
-| 版本 | **0.1.10**（无 `productName`） |
+| 版本 | **0.1.10**（`package.json` 无 `productName` 键；`electron-builder.yml:2` 已设，不影响 userData） |
 | 安装包 | `dist-0110/KubeJS Recipe Studio Setup 0.1.10.exe`，**82,375,390 B** |
 | **SHA-256** | **`f94900cecaeaa54650e5d28dce3f5d3bc6840fd445c878aeb2dd51b382df3816`** |
 | 门禁 | typecheck 0 / lint 0 / 853 passed / build 0 / NSIS 0 |
