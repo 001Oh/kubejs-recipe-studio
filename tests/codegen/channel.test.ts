@@ -222,6 +222,42 @@ describe('三档生成偏好', () => {
     })
     expect(decision.error).toContain('数据包')
   })
+
+  it('emitTarget 为空串时视同 null：不得直发语法糖（P3-8，修复前 kubejs-sugar → 红）', () => {
+    const empty = schema({ id: 'some:plugin_type', emitTarget: '' })
+    const decision = decideChannel({
+      schema: empty,
+      addons: [],
+      hasSamples: true,
+      preference: 'always-sugar',
+      requiresScript: false,
+      filledUnsupportedFields: []
+    })
+    expect(decision.channel).not.toBe('kubejs-sugar')
+    expect(decision.error).not.toBeNull()
+  })
+
+  it('emitTarget 空串与 null 的决策完全一致（P3-8 守卫）', () => {
+    const asEmpty = decideChannel({
+      schema: schema({ id: 'some:plugin_type', emitTarget: '' }),
+      addons: [],
+      hasSamples: true,
+      preference: 'auto',
+      requiresScript: false,
+      filledUnsupportedFields: []
+    })
+    const asNull = decideChannel({
+      schema: schema({ id: 'some:plugin_type', emitTarget: null }),
+      addons: [],
+      hasSamples: true,
+      preference: 'auto',
+      requiresScript: false,
+      filledUnsupportedFields: []
+    })
+    expect(asEmpty.channel).toBe(asNull.channel)
+    expect(asEmpty.blockedFromSugar).toBe(asNull.blockedFromSugar)
+    expect(asEmpty.missingAddon).toBe(asNull.missingAddon)
+  })
 })
 
 describe('预览到语句的一致性', () => {

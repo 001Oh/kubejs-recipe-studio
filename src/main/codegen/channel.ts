@@ -146,13 +146,17 @@ function sugarBlockedReason(schema: RecipeTypeSchema, addon: string | null, unsu
 
 export function decideChannel(input: ChannelInput): ChannelDecision {
   const { schema, preference, addons } = input
+  // P3-8：空串 emitTarget 视同 null（无语法糖）。原先 `!== null` 判定让 '' 绕过
+  // 「附属缺失/无语法糖实现」检查直发语法糖（目标为空）。当前生产者只产非空串或
+  // null，属插件通道的潜伏面；此处把口径钉死。
+  const emitTarget = schema.emitTarget === '' ? null : schema.emitTarget
   const addon = requiredAddonOf(schema)
   const installed = isAddonInstalled(schema, addons)
   const unsupportedFields = input.filledUnsupportedFields.filter((k) => k.length > 0)
   const notes: string[] = []
-  const unverified = schema.emitTarget !== null && !isSugarVerified(schema)
-  const removalOnly = schema.emitTarget === 'event.remove' || schema.id === 'kubejs:remove'
-  const sugarPossible = schema.emitTarget !== null && installed && unsupportedFields.length === 0
+  const unverified = emitTarget !== null && !isSugarVerified(schema)
+  const removalOnly = emitTarget === 'event.remove' || schema.id === 'kubejs:remove'
+  const sugarPossible = emitTarget !== null && installed && unsupportedFields.length === 0
 
   if (unsupportedFields.length > 0) {
     notes.push(`已从语法糖切换为 event.custom —— ${unsupportedFields.join('、')} 无法通过语法糖表达`)
@@ -199,10 +203,10 @@ export function decideChannel(input: ChannelInput): ChannelDecision {
   }
 
   // 自动档（规格 3.6.10 判定顺序：语法糖 → 数据包 JSON → event.custom）
-  if (schema.emitTarget && installed && unsupportedFields.length === 0) {
+  if (emitTarget && installed && unsupportedFields.length === 0) {
     return finish('kubejs-sugar', unsupportedFields, null, unverified, notes, null)
   }
-  if (schema.emitTarget && installed && unsupportedFields.length > 0) {
+  if (emitTarget && installed && unsupportedFields.length > 0) {
     // 附属装了但糖表达不全 → event.custom（保留全部参数，绝不静默丢参数）
     return finish('event-custom', unsupportedFields, null, unverified, notes, null)
   }
@@ -210,7 +214,7 @@ export function decideChannel(input: ChannelInput): ChannelDecision {
     notes.push('未检测到语法糖（附属缺失或无该方法），已切换数据包 JSON（最稳通道）')
     return finish('datapack-json', [], addon, false, notes, null)
   }
-  if (removalOnly && !schema.emitTarget) notes.push('移除配方只能在脚本层执行')
+  if (removalOnly && !emitTarget) notes.push('移除配方只能在脚本层执行')
   return finish('event-custom', [], addon, unverified, notes, null)
 }
 
