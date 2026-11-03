@@ -263,6 +263,17 @@ async function appendToExisting(
     throw describeWriteFailure(err, backupPath)
   }
   logger.info('IO', `追加写入前已备份原文件：${relative(root, backupPath).replace(/\\/g, '/')}`, backupPath)
+  // P3-14：写前二次校验（对齐 commitRecipe 的 TARGET_CHANGED guard）。readFile 与
+  // writeOne 之间文件被外部修改时放弃本次追加，绝不静默覆盖外部改动（备份只保旧值）。
+  let latest: string
+  try {
+    latest = await readFile(path, 'utf8')
+  } catch (err) {
+    throw describeWriteFailure(err, path)
+  }
+  if (latest !== original) {
+    throw new GenerationError(`要追加的文件在读取后被外部修改，已放弃追加：${basename(path)}，请重新打开后再试`, 'TARGET_CHANGED')
+  }
   const bytes = await writeOne(path, merged.text, root)
   return { path, appended: true, bytes, backupPath }
 }
