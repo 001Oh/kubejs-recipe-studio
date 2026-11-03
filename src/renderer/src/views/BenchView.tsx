@@ -51,7 +51,8 @@ export function BenchView(): JSX.Element {
         return
       }
       const draft = createBlankDraft(bench.typeId, schema as never)
-      useBenchStore.setState({ draft, bench: draft.workbench, draftConflict: null, loadedFrom: null })
+      // P2-3：新建空白草稿是会话边界，清空 undo/redo，不让 Ctrl+Z 带回上一个配方的状态
+      useBenchStore.setState({ past: [], future: [], draft, bench: draft.workbench, draftConflict: null, loadedFrom: null })
       toast('已新建空白结构化配方：填好材料与产物后提交', 'success')
     } catch (err) {
       toast(`新建失败：${err instanceof Error ? err.message : String(err)}`, 'error')

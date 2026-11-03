@@ -331,7 +331,12 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
       }
     }
     get().snapshot()
+    // P2-3：打开草稿同样是会话边界（对照 loadFromRecipe 的 T-26/UI-U5）——
+    // 不清栈的话 Ctrl+Z 会把 bench 拉回上一个配方的值，而 draft 仍是新草稿，
+    // 继续提交就会把 A 配方的格子写进 B 配方文件。
     set({
+      past: [],
+      future: [],
       bench: loaded.workbench,
       draft: {
         uid: loaded.meta.base?.uid ?? opened.record.uid,
@@ -419,7 +424,9 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
   cancelDraft() {
     const had = get().draft
     get().snapshot()
-    set({ bench: emptyBench(), draft: null, draftConflict: null, loadedFrom: null, lastCommit: null })
+    // P2-3：取消草稿同样是会话边界——不清栈的话 undo 会复活已取消草稿的 bench 值
+    //（draft 已为 null，走 WriteDialog 通用路径时试点键值会被当普通字段导出）。
+    set({ past: [], future: [], bench: emptyBench(), draft: null, draftConflict: null, loadedFrom: null, lastCommit: null })
     if (had) useAppStore.getState().pushLog('INFO', 'RECIPE', `已取消草稿 ${had.uid}（原始数据未改动）`)
   },
 
