@@ -1,0 +1,366 @@
+/*
+ * UI-REDESIGN-1 · 设计令牌（唯一来源）
+ * 结构令牌（间距/圆角/字号/尺寸/动效）+ 四套主题调色板（石墨翡翠 / 浅色 / 午夜蓝 / OLED 黑）。
+ *
+ * 主题切换机制：<html data-theme="graphite|light|midnight|oled">，由 shared/theme.ts 的注册表校验；
+ * 未知值或缺失属性时回落到 :root 上的石墨翡翠，因此任何情况下都有完整配色可用。
+ *
+ * 约束：间距取 4 的倍数；字号不小于 11px；圆角只用下面这几档；除浮层外不用投影堆叠层级。
+ * 变量命名：语义名（--bg-* / --fg-* / --accent / --line-*）是新代码的入口；
+ * 历史名（--l0-window / --l1-panel / --text-1..3 / --border / --brand）保留为别名。
+ */
+
+/* ───────────────────────── 结构令牌（与主题无关） ───────────────────────── */
+
+:root {
+  /* 4px 栅格 */
+  --u: 4px;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --gap-1: var(--sp-1);
+  --gap-2: var(--sp-2);
+  --gap-3: var(--sp-3);
+  --gap-4: var(--sp-4);
+  --gap-6: var(--sp-6);
+
+  /* 圆角：只有这五档 */
+  --r-xs: 3px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-xl: 12px;
+  --r-pill: 999px;
+  --radius-badge: var(--r-xs);
+  --radius-slot: var(--r-sm);
+  --radius-button: var(--r-md);
+  --radius-card: var(--r-lg);
+  --radius-panel: var(--r-lg);
+
+  /* 字体 */
+  --font-ui: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei',
+    system-ui, -apple-system, sans-serif;
+  --font-code: 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'Consolas', 'Microsoft YaHei UI', monospace;
+  --fs-display: 15px;
+  --fs-title: 13.5px;
+  --fs-body: 13px;
+  --fs-aux: 12px;
+  --fs-badge: 11px;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --lh-tight: 1.25;
+  --lh-body: 1.55;
+
+  /* 控件尺寸 */
+  --h-control: 28px;
+  --h-control-sm: 24px;
+  --h-control-lg: 32px;
+  --h-row: 40px;
+  --row-h: 40px;
+  --log-row-h: 24px;
+  --h-topbar: 48px;
+  --h-rail: 264px;
+  --w-rail-min: 248px;
+  --w-rail-max: 520px;
+  --w-detail: 360px;
+  --w-detail-min: 288px;
+  --w-detail-max: 560px;
+
+  /* 动效：只过渡颜色/位移/透明度，绝不过渡布局属性 */
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+  --t: 100ms var(--ease);
+  --t-active: 60ms var(--ease);
+  --t-slow: 160ms var(--ease);
+
+  /* 由语义色派生的描边与浅底：换主题时自动跟随，不必逐主题重复 rgba */
+  --err-line: color-mix(in srgb, var(--err) 42%, transparent);
+  --err-tint: color-mix(in srgb, var(--err) 18%, transparent);
+  --err-wash: color-mix(in srgb, var(--err) 7%, transparent);
+  --err-edge: color-mix(in srgb, var(--err) 55%, transparent);
+  --warn-line: color-mix(in srgb, var(--warn) 40%, transparent);
+  --warn-tint: color-mix(in srgb, var(--warn) 16%, transparent);
+  --warn-wash: color-mix(in srgb, var(--warn) 7%, transparent);
+  --info-line: color-mix(in srgb, var(--info) 34%, transparent);
+  --ok-line: color-mix(in srgb, var(--ok) 40%, transparent);
+  --accent-tint: color-mix(in srgb, var(--accent) 18%, transparent);
+  --badge-fg: #fff;
+
+  /* 历史别名 → 语义名（主题无关） */
+  --l0-window: var(--bg-app);
+  --l1-panel: var(--bg-panel);
+  --l2-card: var(--bg-raised);
+  --l3-slot: var(--bg-hover);
+  --border: var(--line);
+  --border-hover: var(--line-strong);
+  --border-active: var(--accent);
+  --border-empty-slot: var(--line-inset);
+  --selected-bg: var(--accent-soft);
+  --text-1: var(--fg);
+  --text-2: var(--fg-muted);
+  --text-3: var(--fg-subtle);
+  --brand: var(--accent);
+  --registry-bg: var(--registry-soft);
+  --registry-border: color-mix(in srgb, var(--registry) 45%, transparent);
+  --fluid-bg: var(--fluid-soft);
+  --fluid-border: color-mix(in srgb, var(--fluid) 42%, transparent);
+  --amber: var(--warn);
+  --amber-border: color-mix(in srgb, var(--warn) 50%, transparent);
+
+  /* 焦点环 */
+  --focus-ring: 0 0 0 2px var(--bg-app), 0 0 0 4px var(--accent-line);
+}
+
+/* ───────────────────────── 主题 1：石墨翡翠（默认） ───────────────────────── */
+
+:root,
+[data-theme='graphite'] {
+  color-scheme: dark;
+
+  --bg-app: #111315;
+  --bg-panel: #191d20;
+  --bg-raised: #242a2d;
+  --bg-hover: #2b3235;
+  --bg-active: #313a3d;
+  --bg-inset: #1c2124;
+  --bg-inset-hover: #212729;
+
+  --line: #30373b;
+  --line-soft: #262c2f;
+  --line-strong: #3d464a;
+  --line-inset: #353d41;
+
+  --fg: #e5e7eb;
+  --fg-muted: #9ca3af;
+  --fg-subtle: #78838f;
+  --fg-on-accent: #06211a;
+
+  --accent: #34d399;
+  --accent-strong: #6ee7b7;
+  --accent-deep: #10b981;
+  --accent-soft: rgba(52, 211, 153, 0.14);
+  --accent-softer: rgba(52, 211, 153, 0.08);
+  --accent-line: rgba(52, 211, 153, 0.45);
+  --accent-glow: rgba(52, 211, 153, 0.24);
+
+  --ok: #34d399;
+  --ok-soft: rgba(52, 211, 153, 0.13);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.13);
+  --err: #f87171;
+  --err-soft: rgba(248, 113, 113, 0.13);
+  --info: #7dd3fc;
+  --info-soft: rgba(125, 211, 252, 0.12);
+  --registry: #a78bfa;
+  --registry-soft: rgba(167, 139, 250, 0.14);
+  --fluid: #7dd3fc;
+  --fluid-soft: rgba(125, 211, 252, 0.12);
+  --dirty: #fbbf24;
+
+  --badge-bg: rgba(6, 12, 10, 0.78);
+  --highlight-bg: rgba(251, 191, 36, 0.3);
+  --highlight-fg: #fde68a;
+  --overlay-bg: rgba(9, 11, 12, 0.66);
+  --skeleton: linear-gradient(90deg, #1e2326 25%, #262d30 37%, #1e2326 63%);
+
+  --level-debug: var(--fg-subtle);
+  --level-info: var(--info);
+  --level-warn: var(--warn);
+  --level-error: var(--err);
+  --level-success: var(--ok);
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.32);
+  --shadow-2: 0 10px 28px rgba(0, 0, 0, 0.46);
+  --shadow-3: 0 18px 48px rgba(0, 0, 0, 0.52);
+}
+
+/* ───────────────────────── 主题 2：浅色 ───────────────────────── */
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-app: #f6f7f8;
+  --bg-panel: #ffffff;
+  --bg-raised: #ffffff;
+  --bg-hover: #f1f3f5;
+  --bg-active: #e8ebee;
+  --bg-inset: #f4f6f7;
+  --bg-inset-hover: #eef1f3;
+
+  --line: #e2e5e8;
+  --line-soft: #eceff2;
+  --line-strong: #cbd2d8;
+  --line-inset: #d9dfe4;
+
+  --fg: #16181b;
+  --fg-muted: #4b5563;
+  --fg-subtle: #6b7280;
+  --fg-on-accent: #04231a;
+
+  --accent: #059669;
+  --accent-strong: #047857;
+  --accent-deep: #065f46;
+  --accent-soft: rgba(5, 150, 105, 0.12);
+  --accent-softer: rgba(5, 150, 105, 0.06);
+  --accent-line: rgba(5, 150, 105, 0.45);
+  --accent-glow: rgba(5, 150, 105, 0.2);
+
+  --ok: #047857;
+  --ok-soft: rgba(4, 120, 87, 0.1);
+  --warn: #b45309;
+  --warn-soft: rgba(180, 83, 9, 0.1);
+  --err: #dc2626;
+  --err-soft: rgba(220, 38, 38, 0.09);
+  --info: #0369a1;
+  --info-soft: rgba(3, 105, 161, 0.09);
+  --registry: #7c3aed;
+  --registry-soft: rgba(124, 58, 237, 0.1);
+  --fluid: #0284c7;
+  --fluid-soft: rgba(2, 132, 199, 0.08);
+  --dirty: #b45309;
+
+  --badge-bg: rgba(12, 17, 20, 0.72);
+  --highlight-bg: rgba(251, 191, 36, 0.55);
+  --highlight-fg: #4a3200;
+  --overlay-bg: rgba(23, 27, 30, 0.35);
+  --skeleton: linear-gradient(90deg, #eceff2 25%, #f6f7f8 37%, #eceff2 63%);
+
+  --level-debug: var(--fg-subtle);
+  --level-info: var(--info);
+  --level-warn: var(--warn);
+  --level-error: var(--err);
+  --level-success: var(--ok);
+
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-2: 0 10px 24px rgba(16, 24, 40, 0.12);
+  --shadow-3: 0 18px 44px rgba(16, 24, 40, 0.16);
+}
+
+/* ───────────────────────── 主题 3：午夜蓝 ───────────────────────── */
+
+[data-theme='midnight'] {
+  color-scheme: dark;
+
+  --bg-app: #0c1018;
+  --bg-panel: #121826;
+  --bg-raised: #1a2233;
+  --bg-hover: #212b3d;
+  --bg-active: #28344a;
+  --bg-inset: #0f1521;
+  --bg-inset-hover: #161e2c;
+
+  --line: #263248;
+  --line-soft: #1e2837;
+  --line-strong: #354663;
+  --line-inset: #2c3a52;
+
+  --fg: #e6edf7;
+  --fg-muted: #9fb0c7;
+  --fg-subtle: #7286a3;
+  --fg-on-accent: #04202e;
+
+  --accent: #7dd3fc;
+  --accent-strong: #a5e4ff;
+  --accent-deep: #38bdf8;
+  --accent-soft: rgba(125, 211, 252, 0.15);
+  --accent-softer: rgba(125, 211, 252, 0.08);
+  --accent-line: rgba(125, 211, 252, 0.45);
+  --accent-glow: rgba(125, 211, 252, 0.26);
+
+  --ok: #4ade80;
+  --ok-soft: rgba(74, 222, 128, 0.13);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.13);
+  --err: #fb7185;
+  --err-soft: rgba(251, 113, 133, 0.13);
+  --info: #93c5fd;
+  --info-soft: rgba(147, 197, 253, 0.12);
+  --registry: #c4b5fd;
+  --registry-soft: rgba(196, 181, 253, 0.14);
+  --fluid: #7dd3fc;
+  --fluid-soft: rgba(125, 211, 252, 0.12);
+  --dirty: #fbbf24;
+
+  --badge-bg: rgba(4, 10, 18, 0.78);
+  --highlight-bg: rgba(251, 191, 36, 0.28);
+  --highlight-fg: #fde68a;
+  --overlay-bg: rgba(6, 9, 15, 0.66);
+  --skeleton: linear-gradient(90deg, #161e2c 25%, #1d2739 37%, #161e2c 63%);
+
+  --level-debug: var(--fg-subtle);
+  --level-info: var(--info);
+  --level-warn: var(--warn);
+  --level-error: var(--err);
+  --level-success: var(--ok);
+
+  --shadow-1: 0 1px 2px rgba(2, 6, 14, 0.36);
+  --shadow-2: 0 10px 28px rgba(2, 6, 14, 0.5);
+  --shadow-3: 0 18px 48px rgba(2, 6, 14, 0.56);
+}
+
+/* ───────────────────────── 主题 4：OLED 黑 ───────────────────────── */
+
+[data-theme='oled'] {
+  color-scheme: dark;
+
+  /* 主背景真黑，但面板/浮起层保留极低明度差，避免糊成一整块 */
+  --bg-app: #000000;
+  --bg-panel: #0a0c0b;
+  --bg-raised: #131614;
+  --bg-hover: #191d1a;
+  --bg-active: #202521;
+  --bg-inset: #050706;
+  --bg-inset-hover: #0c0f0d;
+
+  --line: #232826;
+  --line-soft: #171b19;
+  --line-strong: #363e39;
+  --line-inset: #2a312d;
+
+  --fg: #e9eeea;
+  --fg-muted: #9ea9a3;
+  --fg-subtle: #6e7a74;
+  --fg-on-accent: #04140f;
+
+  --accent: #34d399;
+  --accent-strong: #6ee7b7;
+  --accent-deep: #10b981;
+  --accent-soft: rgba(52, 211, 153, 0.15);
+  --accent-softer: rgba(52, 211, 153, 0.07);
+  --accent-line: rgba(52, 211, 153, 0.45);
+  --accent-glow: rgba(52, 211, 153, 0.24);
+
+  --ok: #34d399;
+  --ok-soft: rgba(52, 211, 153, 0.13);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.14);
+  --err: #f87171;
+  --err-soft: rgba(248, 113, 113, 0.14);
+  --info: #7dd3fc;
+  --info-soft: rgba(125, 211, 252, 0.12);
+  --registry: #a78bfa;
+  --registry-soft: rgba(167, 139, 250, 0.15);
+  --fluid: #7dd3fc;
+  --fluid-soft: rgba(125, 211, 252, 0.12);
+  --dirty: #fbbf24;
+
+  --badge-bg: rgba(0, 0, 0, 0.86);
+  --highlight-bg: rgba(251, 191, 36, 0.3);
+  --highlight-fg: #fde68a;
+  --overlay-bg: rgba(0, 0, 0, 0.72);
+  --skeleton: linear-gradient(90deg, #0e110f 25%, #151917 37%, #0e110f 63%);
+
+  --level-debug: var(--fg-subtle);
+  --level-info: var(--info);
+  --level-warn: var(--warn);
+  --level-error: var(--err);
+  --level-success: var(--ok);
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --shadow-2: 0 10px 30px rgba(0, 0, 0, 0.7);
+  --shadow-3: 0 18px 52px rgba(0, 0, 0, 0.78);
+}
