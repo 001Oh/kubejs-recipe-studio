@@ -1,0 +1,59 @@
+{
+  "shapelessBrass": {
+    "source": "alltheores-1.20.1-47.1.3-2.2.4.jar#data/alltheores/recipes/brass_dust_from_alloy_blending.json（1112 包真实样本）",
+    "json": {
+      "type": "minecraft:crafting_shapeless",
+      "category": "misc",
+      "ingredients": [
+        { "item": "alltheores:copper_dust" },
+        { "item": "alltheores:copper_dust" },
+        { "item": "alltheores:copper_dust" },
+        { "tag": "forge:dusts/zinc" }
+      ],
+      "result": { "count": 4, "item": "alltheores:brass_dust" }
+    }
+  },
+  "mixingFluix": {
+    "source": "create-1.19.2-0.5.1.i.jar#data/create/recipes/mixing/compat/ae2/fluix_crystal.json（Construct 包真实样本）",
+    "json": {
+      "type": "create:mixing",
+      "conditions": [{ "type": "forge:mod_loaded", "modid": "ae2" }],
+      "ingredients": [
+        { "tag": "forge:dusts/redstone" },
+        { "item": "ae2:charged_certus_quartz_crystal" },
+        { "tag": "forge:gems/quartz" },
+        { "amount": 250, "fluid": "minecraft:water", "nbt": {} }
+      ],
+      "results": [{ "count": 2, "item": "ae2:fluix_crystal" }]
+    }
+  },
+  "mixingTea": {
+    "source": "create-1.19.2-0.5.1.i.jar#data/create/recipes/mixing/tea.json（Construct 包真实样本）",
+    "json": {
+      "type": "create:mixing",
+      "heatRequirement": "heated",
+      "ingredients": [
+        { "tag": "minecraft:leaves" },
+        { "amount": 250, "fluid": "minecraft:water", "nbt": {} },
+        { "amount": 250, "fluidTag": "forge:milk" }
+      ],
+      "results": [{ "amount": 500, "fluid": "create:tea" }]
+    }
+  },
+  "mixingChance": {
+    "source": "合成样本（仓库内无带概率的真实 create:mixing；按 Create 格式构造，概率用字符串以验证类型保真）",
+    "json": {
+      "type": "create:mixing",
+      "heatRequirement": "superheated",
+      "ingredients": [
+        { "item": "minecraft:redstone" },
+        { "amount": 250, "fluid": "minecraft:water" }
+      ],
+      "results": [
+        { "item": "minecraft:glowstone_dust", "count": "2", "chance": "0.35" },
+        { "item": "minecraft:gold_nugget", "chance": 0.07 }
+      ],
+      "processingTime": 200
+    }
+  }
+}

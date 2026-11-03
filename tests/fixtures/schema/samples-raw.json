@@ -1,0 +1,172 @@
+{
+  "shaped": {
+    "jar": "Ad-Astra-Giselle-Addon-forge-1.20.1-6.21.jar",
+    "name": "data/ad_astra_giselle_addon/recipes/compat/mekanism/crafting/module_acid_rain_proof_unit.json",
+    "json": {
+      "type": "minecraft:crafting_shaped",
+      "conditions": [
+        {
+          "type": "forge:item_exists",
+          "item": "ad_astra_giselle_addon:module_acid_rain_proof_unit"
+        }
+      ],
+      "result": {
+        "item": "ad_astra_giselle_addon:module_acid_rain_proof_unit"
+      },
+      "pattern": [
+        "I#I",
+        "IAI",
+        "PPP"
+      ],
+      "key": {
+        "I": {
+          "tag": "mekanism:alloys/reinforced"
+        },
+        "A": {
+          "item": "mekanism:module_base"
+        },
+        "#": {
+          "tag": "forge:plates/calorite"
+        },
+        "P": {
+          "tag": "forge:pellets/polonium"
+        }
+      }
+    },
+    "source": "Ad-Astra-Giselle-Addon-forge-1.20.1-6.21.jar#data/ad_astra_giselle_addon/recipes/compat/mekanism/crafting/module_acid_rain_proof_unit.json"
+  },
+  "mixing": {
+    "source": "create-1.19.2-0.5.1.i.jar#data/create/recipes/mixing/andesite_alloy.json",
+    "json": {
+      "type": "create:mixing",
+      "ingredients": [
+        {
+          "item": "minecraft:andesite"
+        },
+        {
+          "tag": "forge:nuggets/iron"
+        }
+      ],
+      "results": [
+        {
+          "item": "create:andesite_alloy"
+        }
+      ]
+    }
+  },
+  "shapeless": {
+    "jar": "Ad-Astra-Giselle-Addon-forge-1.20.1-6.21.jar",
+    "name": "data/ad_astra_giselle_addon/recipes/crafting/netherite_oxygen_can_clear.json",
+    "json": {
+      "type": "minecraft:crafting_shapeless",
+      "result": {
+        "item": "ad_astra_giselle_addon:netherite_oxygen_can"
+      },
+      "ingredients": [
+        {
+          "item": "ad_astra_giselle_addon:netherite_oxygen_can"
+        }
+      ]
+    },
+    "source": "Ad-Astra-Giselle-Addon-forge-1.20.1-6.21.jar#data/ad_astra_giselle_addon/recipes/crafting/netherite_oxygen_can_clear.json"
+  },
+  "arcFurnace": {
+    "source": "allthecompressed-1.20.1-3.0.2.jar#data/immersiveengineering/recipes/arc_furnace/allthecompressed/iron/1x_to_1x_steel.json",
+    "json": {
+      "type": "immersiveengineering:arc_furnace",
+      "results": [
+        {
+          "item": "allthecompressed:steel_block_1x"
+        }
+      ],
+      "additives": [
+        {
+          "item": "allthecompressed:coal_block_1x"
+        },
+        {
+          "item": "allthecompressed:coal_block_1x"
+        }
+      ],
+      "input": {
+        "item": "allthecompressed:iron_block_1x"
+      },
+      "time": 560,
+      "energy": 286720,
+      "conditions": [
+        {
+          "type": "forge:and",
+          "values": [
+            {
+              "type": "forge:not",
+              "value": {
+                "type": "forge:mod_loaded",
+                "modid": "compressium"
+              }
+            },
+            {
+              "type": "forge:mod_loaded",
+              "modid": "immersiveengineering"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "infusing": {
+    "source": "Mekanism-1.20.1-10.4.16.80.jar#data/mekanism/recipes/compat/byg/metallurgic_infusing/mossy_stone/stone.json",
+    "json": {
+      "type": "mekanism:metallurgic_infusing",
+      "chemicalInput": {
+        "amount": 10,
+        "tag": "mekanism:bio"
+      },
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "byg"
+        }
+      ],
+      "itemInput": {
+        "ingredient": {
+          "item": "minecraft:stone"
+        }
+      },
+      "output": {
+        "item": "byg:mossy_stone"
+      }
+    }
+  },
+  "reaction": {
+    "source": "Mekanism-1.20.1-10.4.16.80.jar#data/mekanism/recipes/reaction/coal_gasification/blocks_coals.json",
+    "json": {
+      "type": "mekanism:reaction",
+      "duration": 900,
+      "fluidInput": {
+        "amount": 1000,
+        "tag": "minecraft:water"
+      },
+      "gasInput": {
+        "amount": 1000,
+        "gas": "mekanism:oxygen"
+      },
+      "gasOutput": {
+        "amount": 1000,
+        "gas": "mekanism:hydrogen"
+      },
+      "itemInput": {
+        "ingredient": [
+          {
+            "tag": "forge:storage_blocks/coal"
+          },
+          {
+            "tag": "forge:storage_blocks/charcoal"
+          }
+        ]
+      },
+      "itemOutput": {
+        "count": 9,
+        "item": "mekanism:dust_sulfur"
+      }
+    }
+  }
+}

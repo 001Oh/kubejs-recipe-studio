@@ -1,0 +1,35 @@
+{
+  "ladder": {
+    "source": "ad_astra-forge-1.20.1-1.15.20.jar#data/ad_astra/recipes/aeronos_ladder.json（1112 真实样本，pattern 含空格）",
+    "json": {
+      "type": "minecraft:crafting_shaped",
+      "category": "misc",
+      "key": { "#": { "item": "ad_astra:aeronos_planks" } },
+      "pattern": ["# #", "###", "# #"],
+      "result": { "count": 6, "item": "ad_astra:aeronos_ladder" },
+      "show_notification": true
+    }
+  },
+  "stairs": {
+    "source": "ad_astra-forge-1.20.1-1.15.20.jar#data/ad_astra/recipes/aeronos_stairs.json（1112 真实样本，1×2 行宽不齐）",
+    "json": {
+      "type": "minecraft:crafting_shaped",
+      "category": "misc",
+      "key": { "#": { "item": "ad_astra:aeronos_planks" } },
+      "pattern": ["#  ", "## ", "###"],
+      "result": { "count": 4, "item": "ad_astra:aeronos_stairs" },
+      "show_notification": true
+    }
+  },
+  "door": {
+    "source": "ad_astra-forge-1.20.1-1.15.20.jar#data/ad_astra/recipes/aeronos_door.json（1112 真实样本，3 行 × 2 列）",
+    "json": {
+      "type": "minecraft:crafting_shaped",
+      "category": "misc",
+      "key": { "#": { "item": "ad_astra:aeronos_planks" } },
+      "pattern": ["##", "##", "##"],
+      "result": { "count": 3, "item": "ad_astra:aeronos_door" },
+      "show_notification": true
+    }
+  }
+}
