@@ -55,22 +55,26 @@ function closeQuietly(zip: yauzl.ZipFile): void {
 
 /** 列出全部条目名与大小；用于按前缀过滤后决定读哪些。 */
 export async function listEntries(path: string): Promise<JarListResult> {
+  let zip: yauzl.ZipFile | undefined
   try {
-    const zip = await open(path)
+    zip = await open(path)
     const entries: ZipEntryInfo[] = []
     await new Promise<void>((resolve, reject) => {
-      zip.on('entry', (entry) => {
+      zip!.on('entry', (entry) => {
         if (!entry.fileName.endsWith('/')) entries.push({ fileName: entry.fileName, uncompressedSize: entry.uncompressedSize })
-        zip.readEntry()
+        zip!.readEntry()
       })
-      zip.on('end', () => resolve())
-      zip.on('error', reject)
-      zip.readEntry()
+      zip!.on('end', () => resolve())
+      zip!.on('error', reject)
+      zip!.readEntry()
     })
-    closeQuietly(zip)
     return { entries, error: null }
   } catch (err) {
     return { entries: [], error: err instanceof Error ? err.message : String(err) }
+  } finally {
+    // P3-10：与 readEntryBuffer/readMany/listAndRead 同口径——迭代期 error 也必须关句柄，
+    // 否则损坏 jar 的句柄一直挂着（Windows 上文件删不掉、磁盘句柄泄漏）。
+    if (zip) closeQuietly(zip)
   }
 }
 
