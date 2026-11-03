@@ -398,6 +398,13 @@ function containsUnknown(value: NormalizedValue | null): boolean {
   return false
 }
 
+/** canonical 数量键 → 原始 JSON 里可能出现的兄弟键名（pickQuantities 的映射逆表） */
+const QUANTITY_SIBLING_KEYS: Record<string, readonly string[]> = {
+  count: ['count', 'size'],
+  amount: ['amount'],
+  chance: ['chance', 'probability']
+}
+
 /** 反解成 JSON：未编辑（dirtyFields 为空）时直接返回原始结构，避免不必要的重构 */
 export function denormalizeRecipe(
   normalized: NormalizedRecipe,
@@ -425,6 +432,17 @@ export function denormalizeRecipe(
     const schemaSlot = [...schema.slots, ...schema.outputs].find((s) => s.key === key)
     const jsonKey = schemaSlot?.jsonKey ?? key
     base[jsonKey] = toJsonValue(slot.value, schemaSlot)
+    // P2-2：compound 槽的数量来自父对象的兄弟键（normalize 侧 convertRef 从 parent 拾取），
+    // 而 toJsonValue 会把数量写进引用对象内部。若不清理 raw 里的旧顶层键，
+    // 会产出 {"base":{...,"count":4},"count":4} 新旧双值并存，游戏侧解析结果取决于键序。
+    // 只在 schema 明确声明 compound 的槽生效，普通槽零影响。
+    if (schemaSlot?.compound) {
+      for (const c of schemaSlot.compound) {
+        for (const sibling of QUANTITY_SIBLING_KEYS[c] ?? []) {
+          if (sibling !== jsonKey) delete base[sibling]
+        }
+      }
+    }
   }
   return { kind: 'json', json: base }
 }
