@@ -121,6 +121,20 @@ describe('P0 scripts / plugins handler', () => {
     expect(res.error).toContain('不存在')
   })
 
+  it('scripts:rename 目标已存在时必须拒绝且不覆盖（P2-1）', async () => {
+    const fresh = freshPack()
+    PACK = fresh.pack
+    SCRIPTS = fresh.scripts
+    await boot()
+    const res = await invoke<{ name: string }[]>('scripts:rename', { name: 'a_one.js', to: 'b_two.js' })
+    // 拒绝并说明原因（文案含目标名）
+    expect(res.ok).toBe(false)
+    expect(res.error).toContain('b_two.js')
+    // 目标内容逐字节未动，源文件仍在
+    expect(await fsp.readFile(join(SCRIPTS, 'b_two.js'), 'utf8')).toBe('console.info(2)\n')
+    expect(await fsp.readFile(join(SCRIPTS, 'a_one.js'), 'utf8')).toBe('console.info(1)\n')
+  })
+
   it('plugins:list 正常返回（无插件时为空数组，不是错误）', async () => {
     const fresh = freshPack()
     PACK = fresh.pack

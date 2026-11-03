@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
 import type { CoverageReport, PluginManifest } from '@shared/types'
 import type { PluginLoadState, ScriptEntry } from '@shared/ipc'
-import { call, callOrThrow } from '../api'
+import { call, callOrThrow, callRaw } from '../api'
 import { useAppStore } from '../store/appStore'
 import { Icon } from '../components/Icon'
 import { CachePanel } from '../components/CachePanel'
@@ -348,8 +348,15 @@ export function SettingsView(): JSX.Element {
                   className="btn btn-ghost btn-sm"
                   onClick={() => {
                     const prefix = s.name.match(/^(\d{2})_/) ? '' : `${String(99).padStart(2, '0')}_`
-                    void call('scripts:rename', { name: s.name, to: `${prefix}${s.name}` }).then(() => refresh())
-                    pushLog('INFO', 'IO', `脚本重命名为 ${prefix}${s.name}，加载顺序已调整`)
+                    // P2-1：重命名可能被后端拒绝（目标已存在 EEXIST 等），必须显式提示，不得静默
+                    void callRaw('scripts:rename', { name: s.name, to: `${prefix}${s.name}` }).then((res) => {
+                      if (res.ok) {
+                        pushLog('INFO', 'IO', `脚本重命名为 ${prefix}${s.name}，加载顺序已调整`)
+                        refresh()
+                      } else {
+                        toast(res.error || '脚本重命名失败', 'error')
+                      }
+                    })
                   }}
                 >
                   排到最后

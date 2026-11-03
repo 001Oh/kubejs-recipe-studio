@@ -120,6 +120,16 @@ export function registerCodegenHandlers(): void {
     const from = sanitizeScriptName(name)
     const target = sanitizeScriptName(to)
     if (from === target) throw new GenerationError(`新旧文件名相同：${from}`, 'SAME_NAME')
+    // P2-1：fs.rename 在同目录会静默覆盖已存在目标且不留备份（同功能域里覆盖写入有
+    // overwriteConfirmed + .backup 双保护，重命名不能是例外），目标已存在必须拒绝。
+    let targetExists = false
+    try {
+      await stat(join(dir, target))
+      targetExists = true
+    } catch {
+      /* 目标不存在 → 允许重命名 */
+    }
+    if (targetExists) throw new GenerationError(`目标文件已存在：${target}，请换一个文件名`, 'EEXIST')
     try {
       await rename(join(dir, from), join(dir, target))
     } catch (err) {
