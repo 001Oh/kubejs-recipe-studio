@@ -125,7 +125,7 @@ export const BUILTIN_VALUE_NAMES: Record<string, string> = {
   'mekanism:lapis': '青金石（INF）',
   'mekanism:obsidian': '黑曜石（INF）',
   'mekanism:diamond': '钻石（INF）',
-  'mekanism:refined_obsidian': ' refined 黑曜石（INF）',
+  'mekanism:refined_obsidian': 'refined 黑曜石（INF）',
   'mekanism:oxygen': '氧气（GAS）',
   'mekanism:hydrogen': '氢气（GAS）',
   'mekanism:chlorine': '氯气（GAS）',
@@ -144,7 +144,7 @@ export const BUILTIN_VALUE_NAMES: Record<string, string> = {
   heated: '需加热',
   superheated: '需过热',
   melting: '熔化',
-  smoking: ' Smoking',
+  smoking: 'Smoking',
   sandpaper: '砂纸打磨'
 }
 
