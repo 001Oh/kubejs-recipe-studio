@@ -1,0 +1,109 @@
+{
+  "id": "occultism-ritual",
+  "name": "Occultism 仪式支持",
+  "version": "1.0.0",
+  "author": "KubeJS Recipe Studio 示例",
+  "description": "示例插件（规格 3.6.14）：给神秘学仪式提供精确表单、中文字段名与前置条件提示。放到 <整合包>/.recipe-studio/plugins/ 或 userData/plugins/ 即可生效；删掉它 L1 反推照样能编辑这些配方，只是字段名不友好、没有前置条件提示。",
+  "appVersion": ">=0.1.0",
+  "mods": ["occultism"],
+  "kubejsAddon": null,
+  "recipeTypes": [
+    {
+      "id": "occultism:ritual",
+      "displayName": "神秘学 · 仪式",
+      "modId": "occultism",
+      "modDisplayName": "Occultism",
+      "layoutKind": "multi_io",
+      "emitTarget": null,
+      "customTemplate": { "type": "occultism:ritual" },
+      "slots": [
+        {
+          "key": "activation_item",
+          "displayName": "激活物",
+          "kind": "item",
+          "multiple": false,
+          "required": true,
+          "role": "requirement",
+          "zone": "input",
+          "description": "放进仪式祭坛后启动仪式的物品，通常是 ritual_dummy 虚拟物品"
+        },
+        {
+          "key": "ingredients",
+          "displayName": "祭祀材料",
+          "kind": "item",
+          "multiple": true,
+          "min": 1,
+          "max": 12,
+          "zone": "input"
+        },
+        {
+          "key": "pentacle_id",
+          "displayName": "法阵等级",
+          "kind": "choice",
+          "multiple": false,
+          "choicesSource": "values:pentacle_id",
+          "role": "requirement",
+          "zone": "extra",
+          "description": "法阵必须在世界中摆好，等级不够仪式不会启动"
+        },
+        {
+          "key": "require_sacrifice",
+          "displayName": "需要活体献祭",
+          "kind": "boolean",
+          "defaultValue": false,
+          "role": "requirement",
+          "zone": "extra"
+        },
+        {
+          "key": "require_item_use",
+          "displayName": "需要物品使用",
+          "kind": "boolean",
+          "defaultValue": false,
+          "zone": "extra"
+        }
+      ],
+      "outputs": [
+        {
+          "key": "result",
+          "displayName": "产物",
+          "kind": "item",
+          "multiple": true,
+          "min": 1,
+          "max": 6,
+          "zone": "output"
+        }
+      ],
+      "requirements": [
+        { "kind": "structure", "text": "需要搭建仪式祭坛（Ritual Altar）" },
+        { "kind": "structure", "text": "需要在脚下摆放对应等级的五芒星法阵" },
+        { "kind": "time", "text": "仪式按 tick 推进，激活物与材料需同时在位" },
+        { "kind": "research", "text": "部分高阶法阵需要先完成前置仪式解锁" }
+      ],
+      "notes": [
+        "ritual_dummy 是虚拟物品：只作为仪式的“配方密钥”，不会进入玩家背包",
+        "该类型无 KubeJS 语法糖，生成走 event.custom；如只要数据包 JSON，可在设置里选「始终数据包」"
+      ],
+      "docUrl": "https://ocdt.li/",
+      "supportsChance": true
+    }
+  ],
+  "fieldNames": {
+    "pentacle_id": "法阵等级",
+    "activation_item": "激活物",
+    "ingredients": "祭祀材料",
+    "require_sacrifice": "需要活体献祭",
+    "require_item_use": "需要物品使用",
+    "result": "产物",
+    "max_times": "可重复次数",
+    "time": "耗时"
+  },
+  "valueNames": {
+    "occultism:summon_small": "小型使魔法阵（Tier 1）",
+    "occultism:summon_medium": "中型使魔法阵（Tier 2）",
+    "occultism:summon_large": "大型使魔法阵（Tier 3）",
+    "occultism:craft_djinni": "巨灵加工法阵（Tier 2）",
+    "occultism:craft_wild_one": "荒野加工法阵（Tier 1）",
+    "occultism:summon_wither": "凋零召唤法阵（Tier 4）"
+  },
+  "virtualItemPatterns": ["occultism:ritual_dummy/*"]
+}

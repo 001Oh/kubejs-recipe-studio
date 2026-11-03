@@ -1,0 +1,16 @@
+# 默认：文本文件由 git 归一化为 LF 存储，工作区保持原样（避免全量 CRLF 抖动）
+* text=auto
+
+# 二进制资源：不做换行/合并处理
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.pak binary
+*.exe binary
+*.dll binary
+*.jar binary
+*.zip binary
+
+# 锁文件与生成物：不参与 diff 统计
+package-lock.json -diff linguist-generated
