@@ -538,7 +538,9 @@ async function commitCreateRecipe(req: CommitRecipeRequest, deps: CommitDeps = {
 
   const typeId = req.workbench.typeId
   if (!typeId) throw new CommitError('没有配方类型，无法新建', 'NO_TYPE')
-  const schema = select(typeId).schema
+  // P3-15：保留 selection 的 source/notes，用于构造完整的 OpenedRecipe（不再靠 as 掩盖缺字段）
+  const selection = select(typeId)
+  const schema = selection.schema
 
   // 基线必须是「结构完整的空模板」，否则 normalize 出的是空壳，
   // denormalize 无法把 grid 展开成 pattern/key（第 103 批实测：写出 {type,result} 的坏配方）。
@@ -682,11 +684,15 @@ async function commitCreateRecipe(req: CommitRecipeRequest, deps: CommitDeps = {
     opened: {
       record,
       schema,
+      schemaSource: selection.source,
+      // 刚写完且回读校验通过，原文可读
+      status: 'ok',
+      rawKind: 'file',
+      raw: { json: savedJson, rawText: readBack },
       normalized: normalizedFinal,
       diagnostics: [],
-      rawKind: 'file',
-      source: record.source
-    } as unknown as OpenedRecipe,
+      notes: [...selection.notes]
+    },
     dirtyFields: writeDirty,
     bytes: Buffer.byteLength(text),
     indexUpdated,
