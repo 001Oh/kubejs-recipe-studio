@@ -54,6 +54,10 @@ export type CommitErrorCode =
   | 'SAVE_VERIFY_FAILED'
   /** P-C6：回读校验失败后回滚也失败 → 目标状态不确定 */
   | 'SAVE_ROLLBACK_FAILED'
+  /** B120/E-1：解析链接后目标落在整合包之外 → 拒绝写入 */
+  | 'PATH_ESCAPE'
+  /** B120/E-2：请求体本身畸形（渲染层不应发出）→ 未进入任何业务分支 */
+  | 'INVALID_REQUEST'
 
 export class CommitError extends Error {
   readonly code: CommitErrorCode
@@ -96,6 +100,43 @@ function slash(p: string): string {
 function inside(root: string, target: string): boolean {
   const rel = relative(resolve(root), resolve(target))
   return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
+}
+
+/**
+ * B120/E-1：求「最近一个存在祖先」的真实路径，再把不存在的尾部按字面拼回去。
+ *
+ * 直接用 `realpath(target)` 对新建目标是行不通的（`recipe_studio/recipes` 往往还不存在，
+ * 会 ENOENT）；只对 `dirname` 求一次 realpath 也不够（多级目录都不存在时同样失败）。
+ * 不存在的中间路径不可能本身是链接，因此「真实祖先 + 字面尾部」是等价的。
+ */
+async function realpathNearest(path: string): Promise<string | null> {
+  let current = resolve(path)
+  const tail: string[] = []
+  for (let i = 0; i < 64; i += 1) {
+    try {
+      const real = await fsp.realpath(current)
+      return tail.length === 0 ? real : join(real, ...tail.reverse())
+    } catch {
+      const parent = dirname(current)
+      if (parent === current) return null
+      tail.push(basename(current))
+      current = parent
+    }
+  }
+  return null
+}
+
+/**
+ * B120/E-1：`inside()` 只做词法判断（relative + isAbsolute），**不解析链接**——
+ * 包内一个指向包外的 junction 能通过词法校验，把写入带到整合包之外。
+ * 这里再做一次「realpath 之后仍须在包内」的判断；原词法校验保留（双校验，不替换）。
+ */
+async function isInsideReal(root: string, target: string): Promise<boolean> {
+  if (!inside(root, target)) return false
+  const rootReal = await realpathNearest(root)
+  const targetReal = await realpathNearest(target)
+  if (!rootReal || !targetReal) return false
+  return inside(rootReal, targetReal)
 }
 
 async function defaultWriteAtomic(target: string, text: string, guard?: () => Promise<void>): Promise<void> {
@@ -144,6 +185,51 @@ function dirtyForWrite(normalized: ReturnType<typeof normalizeRecipe>['normalize
   )
 }
 
+/**
+ * B120/E-2：`recipes:commit` 的主进程运行时校验（不信任渲染层）。
+ *
+ * 只做「挡住畸形输入」的最小集，不做业务校验（业务校验散在提交流程里各司其职）：
+ * 网格尺寸越界、`values` 形状不对、脏字段不是非空短字符串等都属于渲染层被攻破
+ * 或出 bug 时不该写盘的输入。报错给用户可读中文；错误码统一 `INVALID_REQUEST`。
+ * 纯函数、无 IO——可独立测试。
+ */
+export function validateCommitRequest(req: CommitRecipeRequest): void {
+  function fail(message: string): never {
+    throw new CommitError(message, 'INVALID_REQUEST')
+  }
+  if (typeof req !== 'object' || req === null) fail('提交请求格式不正确')
+  const r = req as unknown as Record<string, unknown>
+  if (typeof r['uid'] !== 'string' || (r['uid'] as string).length === 0 || (r['uid'] as string).length > 512) {
+    fail('提交请求缺少有效的配方标识（uid）')
+  }
+  if (r['mode'] !== 'overwrite' && r['mode'] !== 'copy' && r['mode'] !== 'create') {
+    fail('提交模式不正确（只支持覆盖 / 另存副本 / 新建）')
+  }
+  const dirty: unknown = r['dirtyFields']
+  if (!Array.isArray(dirty) || dirty.length > 256) fail('脏字段列表不正确')
+  for (const item of dirty) {
+    if (typeof item !== 'string' || item.length === 0 || item.length > 128) {
+      fail('脏字段列表含有不合法的字段名')
+    }
+  }
+  const wb = r['workbench']
+  if (typeof wb !== 'object' || wb === null || Array.isArray(wb)) fail('工作台状态缺失或格式不正确')
+  const w = wb as Record<string, unknown>
+  const values = w['values']
+  if (typeof values !== 'object' || values === null || Array.isArray(values)) fail('工作台槽位数据不正确')
+  if (w['typeId'] !== undefined && (typeof w['typeId'] !== 'string' || (w['typeId'] as string).length > 512)) {
+    fail('工作台配方类型不正确')
+  }
+  for (const key of ['gridRows', 'gridCols'] as const) {
+    const v = w[key]
+    if (v === undefined) continue
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 1 || v > 9) {
+      fail('网格尺寸必须是 1–9 的整数')
+    }
+  }
+}
+
+
 function makeRecord(opts: {
   recipeId: string
   type: string
@@ -191,6 +277,8 @@ function selectionMatches(selection: SchemaSelection, req: CommitRecipeRequest):
  * 提交草稿。所有失败都以 CommitError 抛出（name = code），不返回“假成功”。
  */
 export async function commitRecipe(req: CommitRecipeRequest, deps: CommitDeps = {}): Promise<CommitRecipeResult> {
+  // B120/E-2：主进程不信任渲染层——入口先过形状校验，且必须在分支之前（create 也走同一道闸）
+  validateCommitRequest(req)
   // T-28：'create' 走独立分支——空白草稿没有索引记录，不能复用 overwrite/copy 的
   // 「先 find(uid) 再以 record.rel 派生路径」流程（那两者行为零改动）。
   if (req.mode === 'create') return commitCreateRecipe(req, deps)
@@ -317,6 +405,10 @@ export async function commitRecipe(req: CommitRecipeRequest, deps: CommitDeps = 
     if (!inside(modpack.path, target) || !target.toLowerCase().endsWith('.json')) {
       throw new CommitError('原始配方文件不在整合包内，拒绝原地覆盖', 'NO_WRITABLE_TARGET')
     }
+    // B120/E-1：词法过了不等于真实路径在包内（源文件或它的父目录可能是指向包外的链接）
+    if (!(await isInsideReal(modpack.path, target))) {
+      throw new CommitError('目标路径越出整合包目录', 'PATH_ESCAPE')
+    }
   } else {
     if (!modpack.hasKubejs) {
       throw new CommitError('该整合包没有 KubeJS，无法写覆盖数据包；当前不会改动原始文件', 'NO_WRITABLE_TARGET')
@@ -330,6 +422,10 @@ export async function commitRecipe(req: CommitRecipeRequest, deps: CommitDeps = 
 
   if (!inside(modpack.path, target)) {
     throw new CommitError('写盘路径越出整合包目录，拒绝写入', 'NO_WRITABLE_TARGET')
+  }
+  // B120/E-1：写盘前再按真实路径校验一次（copy / 覆盖数据包两条分支都在这里收敛）
+  if (!(await isInsideReal(modpack.path, target))) {
+    throw new CommitError('目标路径越出整合包目录', 'PATH_ESCAPE')
   }
 
   // 文件型覆盖：写前再次确认目标内容仍是当前基线（防止读后被外部修改）
@@ -605,6 +701,10 @@ async function commitCreateRecipe(req: CommitRecipeRequest, deps: CommitDeps = {
   }
   if ((await readText(target)) !== null) {
     throw new CommitError('新建目标文件名冲突过多，请稍后重试', 'TARGET_EXISTS')
+  }
+  // B120/E-1：新建目录/文件同样要过真实路径校验（kubejs/data 下可能已有指向包外的链接）
+  if (!(await isInsideReal(modpack.path, dir)) || !(await isInsideReal(modpack.path, target))) {
+    throw new CommitError('目标路径越出整合包目录', 'PATH_ESCAPE')
   }
 
   const recipeId = 'recipe_studio:' + leaf

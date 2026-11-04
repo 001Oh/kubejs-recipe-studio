@@ -67,8 +67,29 @@ async function readIfExists(path: string): Promise<string | null> {
   }
 }
 
-/** 递归找 recipe JSON 文件；rel 用 `/` 分隔，与 jar 条目路径同构 */
-async function walkDir(dir: string, relBase: string, out: { abs: string; rel: string }[]): Promise<void> {
+/**
+ * B120/E-1：递归深度上限。整合包目录树是外部输入，恶意/异常包可以用极深目录或
+ * 链接成环把扫描卡死（`walkDir` 是主线程串行）；超过此深度只告警并剪枝该分支。
+ */
+const MAX_WALK_DEPTH = 32
+
+/**
+ * 递归找 recipe JSON 文件；rel 用 `/` 分隔，与 jar 条目路径同构。
+ *
+ * B120/E-1：用 `lstat` 而非 `stat`——符号链接（Windows 上 junction 同样算链接）
+ * 一律 `continue`，**不跟随、不递归**。理由：跟随链接会把扫描范围扩展到整合包之外
+ * （任意深度/成环 → DoS），且链接目标不受 `inside()` 词法校验约束。
+ */
+async function walkDir(
+  dir: string,
+  relBase: string,
+  out: { abs: string; rel: string }[],
+  depth = 0
+): Promise<void> {
+  if (depth > MAX_WALK_DEPTH) {
+    logger.warn('INDEX', `目录层级超过 ${MAX_WALK_DEPTH} 层，已跳过该分支：${dir}`, '可能是异常目录树或链接成环')
+    return
+  }
   let names: string[]
   try {
     names = await fsp.readdir(dir)
@@ -80,11 +101,12 @@ async function walkDir(dir: string, relBase: string, out: { abs: string; rel: st
     const rel = relBase ? `${relBase}/${name}` : name
     let st
     try {
-      st = await fsp.stat(abs)
+      st = await fsp.lstat(abs)
     } catch {
       continue
     }
-    if (st.isDirectory()) await walkDir(abs, rel, out)
+    if (st.isSymbolicLink()) continue
+    if (st.isDirectory()) await walkDir(abs, rel, out, depth + 1)
     else if (JSON_EXT_RE.test(name)) out.push({ abs, rel })
   }
 }

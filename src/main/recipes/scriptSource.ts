@@ -234,7 +234,14 @@ export function parseKubejsScript(code: string, scriptRelPath: string): ScriptRe
   return hits
 }
 
-async function findScripts(dir: string, base: string, out: string[]): Promise<void> {
+/** B120/E-1：与 jsonSource.walkDir 同一条规则（深度上限 + 不跟随链接），两处各自就地实现、不做抽象 */
+const MAX_SCRIPT_WALK_DEPTH = 32
+
+async function findScripts(dir: string, base: string, out: string[], depth = 0): Promise<void> {
+  if (depth > MAX_SCRIPT_WALK_DEPTH) {
+    logger.warn('INDEX', `脚本目录层级超过 ${MAX_SCRIPT_WALK_DEPTH} 层，已跳过该分支：${dir}`, '可能是异常目录树或链接成环')
+    return
+  }
   let names: string[]
   try {
     names = await fsp.readdir(dir)
@@ -246,11 +253,13 @@ async function findScripts(dir: string, base: string, out: string[]): Promise<vo
     const rel = base ? `${base}/${name}` : name
     let st
     try {
-      st = await fsp.stat(abs)
+      // B120/E-1：lstat + 跳过链接，避免跟随到整合包外或链接成环
+      st = await fsp.lstat(abs)
     } catch {
       continue
     }
-    if (st.isDirectory()) await findScripts(abs, rel, out)
+    if (st.isSymbolicLink()) continue
+    if (st.isDirectory()) await findScripts(abs, rel, out, depth + 1)
     else if (name.toLowerCase().endsWith('.js')) out.push(abs)
   }
 }
