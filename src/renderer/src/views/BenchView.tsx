@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { JSX } from 'react'
 import type { SlotValue } from '@shared/types'
+import { recipeTypeNameZh } from '@shared/recipeTypeNames'
 import { callOrThrow } from '../api'
 import { useAppStore } from '../store/appStore'
 import { INPUTS_KEY, OUTPUTS_KEY, useBenchStore } from '../store/benchStore'
@@ -17,7 +18,6 @@ import { TypeSelect } from './bench/panels/TypeSelect'
 import { useBenchInteractions } from './bench/useBenchInteractions'
 import { useBenchUiStore } from './bench/benchUiStore'
 import { StartHerePanel } from './bench/StartHerePanel'
-import { NewDraftTypePicker } from './bench/NewDraftTypePicker'
 import { MODE_NOTES, resolveEntryStates, writeTargetOf, type EditEntryId } from './bench/editModes'
 import { Icon } from '../components/Icon'
 import './views.css'
@@ -44,20 +44,26 @@ export function BenchView(): JSX.Element {
   // 第 4 条：清空是破坏性操作，改两步内联确认（项目 lint 禁 window.confirm）
   const [clearArmed, setClearArmed] = useState(false)
   const [newDraftBusy, setNewDraftBusy] = useState(false)
-  // 第 116 批 A-4：新建前先选类型（类型来自 schema:list，非试点类型可见但置灰）
-  const [typePickOpen, setTypePickOpen] = useState(false)
-  // B 方案：从零新建结构化配方（当前类型是试点类型、且还没有草稿时可用）
-  // typeId 显式传入：类型选择器刚改完类型时，闭包里的 bench.typeId 还是旧值
-  const startBlankDraft = async (typeId: string = bench.typeId): Promise<void> => {
+  // 第 119 批：空白草稿的类型**只由头顶的类型选择器（TypeSelect）决定**。
+  // 此前「② 从零新建」会先弹 NewDraftTypePicker 再选一次类型，等于两套入口各自维护「当前类型」，
+  // 选完还可能和头顶不一致（头顶显示 A、草稿建成 B）。现在删掉第二套：头顶选谁就建谁，
+  // 类型不合适就回头顶换——单一入口，单一真相。
+  // typeId 仍可显式传入：调用方若已确定目标类型（如测试）可直接指定。
+  const startBlankDraft = async (typeId?: string): Promise<void> => {
     if (newDraftBusy) return
+    // 现取而非读闭包：刚在头顶切完类型时，闭包里的 bench 可能还是上一帧的值
+    const target = typeId ?? useBenchStore.getState().bench.typeId
     setNewDraftBusy(true)
     try {
-      const schema = await callOrThrow('schema:get', { typeId })
+      const schema = await callOrThrow('schema:get', { typeId: target })
       if (!schema) {
-        toast('该类型没有可用 schema，无法进入结构化编辑', 'warn')
+        toast(
+          `类型「${recipeTypeNameZh(target)}」没有可用 schema，无法进入结构化编辑：请在上方「配方类型」里换一个带 schema 的类型`,
+          'warn'
+        )
         return
       }
-      const draft = createBlankDraft(typeId, schema as never)
+      const draft = createBlankDraft(target, schema as never)
       // P2-3：新建空白草稿是会话边界，清空 undo/redo，不让 Ctrl+Z 带回上一个配方的状态
       useBenchStore.setState({ past: [], future: [], draft, bench: draft.workbench, draftConflict: null, loadedFrom: null })
       toast('已新建空白结构化配方：填好材料与产物后提交', 'success')
@@ -120,8 +126,8 @@ export function BenchView(): JSX.Element {
       return
     }
     if (id === 'create') {
-      // A-4：先选类型，再建草稿（不再用"当前类型"闷头新建）
-      setTypePickOpen(true)
+      // 第 119 批：不再二次选型——头顶的类型选择器就是唯一入口，点「新建」直接按它建草稿
+      void startBlankDraft()
       return
     }
     // ③ 快速导出：直接给出可填的字段，不让人先猜"在哪里填"
@@ -194,8 +200,8 @@ export function BenchView(): JSX.Element {
           <button
             className="btn btn-ghost tiny"
             disabled={newDraftBusy}
-            title="先选一个配方类型，再新建空白结构化配方（不基于任何已有配方）"
-            onClick={() => setTypePickOpen(true)}
+            title={`按头顶选定的「${recipeTypeNameZh(bench.typeId)}」新建空白结构化配方（不基于任何已有配方）；要换类型先在上方「配方类型」里改`}
+            onClick={() => void startBlankDraft()}
           >
             {newDraftBusy ? '新建中…' : '新建结构化配方'}
           </button>
@@ -231,20 +237,8 @@ export function BenchView(): JSX.Element {
         ) : (
           <>
             {inputs.length === 0 && outputs.length === 0 ? (
-              typePickOpen ? (
-                <NewDraftTypePicker
-                  summaries={summaries}
-                  currentTypeId={bench.typeId}
-                  onPick={(s) => {
-                    useBenchStore.getState().setTypeId(s.id, s.layoutKind)
-                    setTypePickOpen(false)
-                    void startBlankDraft(s.id)
-                  }}
-                  onCancel={() => setTypePickOpen(false)}
-                />
-              ) : (
-                <StartHerePanel entries={entryStates} onPick={onPickEntry} />
-              )
+              // 第 119 批：空态只留三入口面板。类型由头顶选择器决定，这里不再插一层选型列表
+              <StartHerePanel entries={entryStates} onPick={onPickEntry} />
             ) : null}
             <div className="bench-cols">
               <SlotColumn

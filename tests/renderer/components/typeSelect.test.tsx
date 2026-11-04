@@ -95,8 +95,9 @@ describe('D 类型选择器（全量下拉）', () => {
     openList()
     const texts = [...document.querySelectorAll('.type-popover .type-row .item-zh')].map((n) => (n.textContent || '').trim())
     for (const t of texts) expect(t.length).toBeGreaterThan(0)
-    // 四项都有中文（第四项 displayName 是裸 id，靠 recipeTypeNameZh 的组合表补出来）
-    expect(texts.filter((t) => /[\u4e00-\u9fa5]/.test(t)).length).toBe(SUMMARIES.length)
+    // 第 118 批：thermal:pulverizer 等已入组合表，四类插件/裸 id 类型全部出中文；
+    // 加上底部「⚙ 通用 / 任意模组配方」行（也含中文），故总数 = SUMMARIES.length + 1。
+    expect(texts.filter((t) => /[\u4e00-\u9fa5]/.test(t)).length).toBe(SUMMARIES.length + 1)
   })
 
   it('无置灰：capability=unsupported 的行同样可点（兼容/不支持只是标注，不是禁选）', () => {
