@@ -10,7 +10,7 @@
  * - `EACCES`/`EPERM` 抛出带 code 的错误（`name` 即错误码，ipcRegistry 原样透传），UI 据此提供「另存到桌面」。
  */
 import { existsSync } from 'node:fs'
-import { mkdir, open, readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, open, readdir, readFile, realpath, rename, unlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { SCRIPT_FILE_PREFIX } from '../../shared/constants'
 import type { GenerationChannel, ModpackInfo } from '../../shared/types'
@@ -58,9 +58,57 @@ export function scriptsDir(modpack: ModpackInfo): string {
   return join(modpack.path, 'kubejs', 'server_scripts')
 }
 
+/**
+ * B120/E-1：求「最近一个存在祖先」的真实路径，再把不存在的尾部按字面拼回去。
+ *
+ * 与 recipes/commitRecipe.ts 同一问题的 codegen 侧就地实现（与 scriptSource 的
+ * 「各自就地实现、不做抽象」同例）：直接 `realpath(target)` 对新建目标行不通
+ * （目录往往还不存在，ENOENT）；只对 `dirname` 求一次也不够（多级目录都不存在）。
+ * 不存在的中间路径不可能本身是链接，因此「真实祖先 + 字面尾部」是等价的。
+ */
+async function realpathNearest(path: string): Promise<string | null> {
+  let current = resolve(path)
+  const tail: string[] = []
+  for (let i = 0; i < 64; i += 1) {
+    try {
+      const real = await realpath(current)
+      return tail.length === 0 ? real : join(real, ...tail.reverse())
+    } catch {
+      const parent = dirname(current)
+      if (parent === current) return null
+      tail.push(basename(current))
+      current = parent
+    }
+  }
+  return null
+}
+
+/**
+ * B120/E-1：`inside()` 只做词法判断，**不解析链接**——包内一个指向包外的
+ * 目录 junction 能通过词法校验，让 tmp+rename 整体写到整合包之外（委托方实测
+ * `landedOutside:true`）。这里再做一次「realpath 之后仍须在包内」的判断；
+ * 原词法校验保留（双校验，不替换）。
+ */
+async function isInsideReal(root: string, target: string): Promise<boolean> {
+  if (!inside(root, target)) return false
+  const rootReal = await realpathNearest(root)
+  const targetReal = await realpathNearest(target)
+  if (!rootReal || !targetReal) return false
+  return inside(rootReal, targetReal)
+}
+
+/** B120/E-1：真实路径越出 root → 统一 OUTSIDE_ROOT（与词法检查同一错误码，UI 语义不变） */
+async function assertInsideReal(root: string, target: string, what: string): Promise<void> {
+  if (await isInsideReal(root, target)) return
+  throw new GenerationError(`${what}的真实路径越出整合包目录，拒绝写入：${target}`, 'OUTSIDE_ROOT')
+}
+
 /** 目录不存在则创建（连 `kubejs/` 一起建），首次创建留下提示文件 */
 export async function ensureScriptsDir(modpack: ModpackInfo): Promise<string> {
   const dir = scriptsDir(modpack)
+  // B120/E-1：必须在 existsSync 判断**之前**——dir 已存在时可能正是指向包外的 junction，
+  // 直接返回会让后续写盘全部穿过链接落在包外。
+  await assertInsideReal(modpack.path, dir, '脚本目录')
   if (existsSync(dir)) return dir
   try {
     await mkdir(dir, { recursive: true })
@@ -136,6 +184,9 @@ function assertSyntax(code: string, channel: GenerationChannel): void {
 async function writeOne(path: string, content: string, root: string): Promise<number> {
   // T-08：对齐 recipes:commit 的写盘保护——原子写（tmp + fsync + rename）+ 写后回读。
   // 原来直接 writeFile：半写会留下截断文件，且无法发现「写进去了但内容不对」。
+  // B120/E-1：tmp+rename 的 dirname 解析由文件系统完成，词法 inside() 看不见链接——
+  // 目录级 junction 会让写入整体落在包外，因此 mkdir/tmp 之前先做真实路径校验。
+  await assertInsideReal(root, path, '写入目标')
   const tmp = join(dirname(path), `.${basename(path)}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`)
   let handle: Awaited<ReturnType<typeof open>> | null = null
   try {
@@ -184,6 +235,9 @@ function inside(root: string, target: string): boolean {
 }
 
 async function backupExisting(file: string, root: string): Promise<string> {
+  // B120/E-1：rename 的目标（`.backup/`）由 dirname(file) 派生——file 的父目录若是
+  // 指向包外的 junction，备份会落在包外（且先于 writeOne 执行，必须在这里拦）。
+  await assertInsideReal(root, file, '备份目标')
   const target = join(dirname(file), BACKUP_DIR, `${basename(file)}.${fileStamp(Date.now())}`)
   try {
     await mkdir(dirname(target), { recursive: true })
