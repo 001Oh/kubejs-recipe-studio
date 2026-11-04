@@ -1,6 +1,6 @@
 {
   "name": "kubejs-recipe-studio",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "KubeJS Recipe Studio — 为 Minecraft 整合包可视化编写 KubeJS 配方的桌面应用",
   "main": "./out/main/index.js",
   "author": "KubeJS Recipe Studio",
