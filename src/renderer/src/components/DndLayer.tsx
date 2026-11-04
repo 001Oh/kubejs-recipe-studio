@@ -114,7 +114,7 @@ export function DndLayer({ children }: { children: ReactNode }): JSX.Element {
         <div className="absorb-bar">
           <ItemIcon item={toIconSource(eyedropper)} size={32} />
           <span>{eyedropper.nameZh}</span>
-          <span className="aux">点击放置 · Shift 连续 · 中键点槽位粘贴（免 Shift 可连续）· 右键取消</span>
+          <span className="aux">点击放置 · Shift 连续 · 中键点槽位粘贴 · 右键取消</span>
           <button className={`chip${eyedropperKeep ? ' on' : ''}`} onClick={() => setEyedropperKeep(!eyedropperKeep)}>
             连续放置 {eyedropperKeep ? '开' : '关'}
           </button>
