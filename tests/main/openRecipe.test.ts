@@ -37,24 +37,30 @@ describe('selectSchema（P-C1 试点）', () => {
     expect(isPilotType('minecraft:crafting_shaped')).toBe(true)
   })
 
-  it('P-C2：shapeless / mixing 返回固定试点 schema', () => {
+  it('P-C2：shapeless / 原版家族返回固定内置 schema（T-117：mixing 移除）', () => {
     const shapeless = selectSchema('minecraft:crafting_shapeless')
     expect(shapeless.source).toBe('builtin')
     expect(shapeless.schema.layoutKind).toBe('shapeless')
     expect(shapeless.schema.slots[0]?.key).toBe('ingredients')
     expect(shapeless.schema.outputs[0]?.key).toBe('result')
-    const mixing = selectSchema('create:mixing')
-    expect(mixing.source).toBe('builtin')
-    expect(mixing.schema.layoutKind).toBe('multi_io')
-    expect(mixing.schema.slots[0]?.key).toBe('ingredients')
-    expect(mixing.schema.outputs[0]?.key).toBe('results')
-    expect(mixing.schema.supportsChance).toBe(true)
-    expect(isPilotType('create:mixing')).toBe(true)
+    // T-117：create:mixing 移出内置库（等 KJS 语法糖批次回归）
+    expect(isPilotType('create:mixing')).toBe(false)
+    const stone = selectSchema('minecraft:stonecutting')
+    expect(stone.source).toBe('builtin')
+    expect(stone.schema.layoutKind).toBe('single_io')
+    expect(stone.schema.slots[0]?.key).toBe('ingredient')
+    const smith = selectSchema('minecraft:smithing_transform')
+    expect(smith.source).toBe('builtin')
+    expect(smith.schema.slots.map((sl) => sl.key)).toEqual(['template', 'base', 'addition'])
+    expect(selectSchema('minecraft:smelting').source).toBe('builtin')
+    expect(selectSchema('minecraft:blasting').source).toBe('builtin')
+    expect(selectSchema('minecraft:smoking').source).toBe('builtin')
+    expect(selectSchema('minecraft:campfire_cooking').source).toBe('builtin')
   })
 
-  it('P-C2：注册表里的推断 schema 不会覆盖试点固定 schema', () => {
+  it('P-C2：注册表里的推断 schema 不会覆盖内置固定 schema', () => {
     putLayer('inferred', {
-      id: 'create:mixing',
+      id: 'minecraft:crafting_shapeless',
       displayName: 'inferred mixing',
       modId: 'create',
       modDisplayName: 'Create',
@@ -67,7 +73,7 @@ describe('selectSchema（P-C1 试点）', () => {
       capability: 'compatible'
     })
     try {
-      const sel = selectSchema('create:mixing')
+      const sel = selectSchema('minecraft:crafting_shapeless')
       expect(sel.source).toBe('builtin')
       expect(sel.schema.slots[0]?.key).toBe('ingredients')
     } finally {
@@ -181,7 +187,7 @@ describe('openRecipe（原始为权威）', () => {
     expect(opened.normalized?.partial.reasons).toContain('unclaimed-keys')
   })
 
-  it('P-C2 create:mixing 真实样本：流体/nbt/条件与诊断一起返回', async () => {
+  it('P-C2 create:mixing 真实样本：流体/nbt/条件与诊断一起返回（T-117：mixing 无 schema → 旧链路 layout 记为 custom）', async () => {
     const raw = pc2samples.mixingFluix.json
     const opened = await openRecipe('u1', {
       lookup: () => record({ type: 'create:mixing', uid: 'u1', sourcePath: 'mixing.json' }),
@@ -189,7 +195,7 @@ describe('openRecipe（原始为权威）', () => {
       select: selectSchema
     })
     expect(opened.status).toBe('ok')
-    expect(opened.schema.layoutKind).toBe('multi_io')
+    expect(opened.schema.layoutKind).toBe('custom')
     expect(opened.normalized?.unknowns.map((u) => u.path)).toContain('$.conditions')
     expect(opened.normalized?.partial.reasons).toContain('ambient-conditions')
   })

@@ -6,7 +6,7 @@ import type { RecipeRecord } from '@shared/types'
 import { call } from '../../api'
 import { useAppStore } from '../../store/appStore'
 import { useBenchStore } from '../../store/benchStore'
-import { pilotEnabled } from '../../store/draftBridge'
+
 
 /** 旧链路没有 schema 布局信息，按类型粗分：只有有序合成本身是网格 */
 export function layoutForRecord(record: RecipeRecord): 'shaped' | 'multi_io' {
@@ -18,8 +18,9 @@ export async function loadRecipeToBench(record: RecipeRecord): Promise<{ ok: boo
   const bench = useBenchStore.getState()
   app.selectRecipe(record)
 
-  /** 试点类型走 recipes:open（原始为权威）；其余类型保持旧链路不变 */
-  if (!pilotEnabled(app.ui?.benchV2 ?? [], record.type)) {
+  /** 注册表里存在该类型的 schema → 结构化链路；否则旧链路（U-22 后：未知类型走通用回退） */
+  const known = await call('schema:get', { typeId: record.type })
+  if (!known) {
     bench.loadFromRecipe(record, layoutForRecord(record), record.type)
     app.setView('bench')
     return { ok: true }

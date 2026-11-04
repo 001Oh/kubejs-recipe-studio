@@ -2,9 +2,8 @@
  * 工作台：schema 驱动的配方编辑区（试点类型）+ 通用表单兜底（任意模组配方）。
  * 布局：会话条（试点面板）→ 编辑区 → 底部动作条；改动一律写回同一份 bench values。
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { JSX } from 'react'
-import type { SchemaSummary } from '@shared/ipc'
 import type { SlotValue } from '@shared/types'
 import { callOrThrow } from '../api'
 import { useAppStore } from '../store/appStore'
@@ -14,6 +13,7 @@ import { createBlankDraft, isBlankDraft } from '../store/draftBridge'
 import { PilotGridEditor } from './bench/PilotGridEditor'
 import { PilotListEditor } from './bench/PilotListEditor'
 import { WriteDialog } from './bench/panels/WriteDialog'
+import { TypeSelect } from './bench/panels/TypeSelect'
 import { useBenchInteractions } from './bench/useBenchInteractions'
 import { useBenchUiStore } from './bench/benchUiStore'
 import { StartHerePanel } from './bench/StartHerePanel'
@@ -84,34 +84,21 @@ export function BenchView(): JSX.Element {
   const clearEyedropper = useAppStore((s) => s.clearEyedropper)
   const toast = useAppStore((s) => s.toast)
 
-  const [summaries, setSummaries] = useState<SchemaSummary[]>([])
-  const [typeError, setTypeError] = useState<string | null>(null)
+  const summaries = useBenchUiStore((s) => s.summaries)
+  const typeError = useBenchUiStore((s) => s.summariesError)
   const [extras, setExtras] = useState<ExtraField[]>([])
-  const typeInput = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    void callOrThrow('schema:list')
-      .then((res) => {
-        setSummaries(res)
-        setTypeError(null)
-      })
-      .catch((err: unknown) => {
-        setSummaries([])
-        setTypeError(err instanceof Error ? err.message : String(err))
-      })
-  }, [])
-
-  useEffect(() => {
-    const focus = (): void => typeInput.current?.focus()
-    window.addEventListener('studio:focus-type-select', focus)
-    return () => window.removeEventListener('studio:focus-type-select', focus)
+    // T-117：类型清单走 benchUiStore（与类型选择器共用同一份，避免两处各自打 IPC 造成不一致）
+    void useBenchUiStore.getState().loadSummaries()
   }, [])
 
   const inputs = useMemo(() => asList(bench.values[INPUTS_KEY]), [bench.values])
   const outputs = useMemo(() => asList(bench.values[OUTPUTS_KEY]), [bench.values])
   const extrasValue = bench.values['extras']
-  const pilotTypes = useAppStore((s) => s.ui?.benchV2 ?? [])
-  const pilotType = pilotTypes.includes(bench.typeId)
+  // T-117：试点白名单废除——「能不能结构化编辑」= 「这个类型在注册表里有没有 schema」。
+  // 候选清单就是注册表清单（schema:list），不再另设 ui.benchV2 白名单。
+  const pilotType = summaries.some((s) => s.id === bench.typeId)
   const isGeneric = bench.typeId === GENERIC || (summaries.length > 0 && summaries.every((s) => s.id !== bench.typeId))
 
   // D1/D2：入口可用性与「这次提交会写到哪里」都从当前状态派生；文案唯一来源见 bench/editModes.ts
@@ -180,43 +167,23 @@ export function BenchView(): JSX.Element {
   return (
     <div className="bench">
       <header className="work-head">
-        <label className="section-label bench-type-label" htmlFor="bench-type">
-          配方类型
-        </label>
-        <div className="field bench-type-field">
-          <span className="field-icon">
-            <Icon name="recipe" size={14} />
-          </span>
-          <input
-            id="bench-type"
-            ref={typeInput}
-            className="input mono"
-            list="bench-type-options"
-            value={bench.typeId}
-            disabled={!!pilotDraft}
-            title={pilotDraft ? '试点草稿打开时不能切换类型（先取消草稿）' : '输入或选择配方类型，Ctrl+E 聚焦'}
-            onChange={(e) => useBenchStore.getState().setTypeId(e.target.value, bench.layoutKind, [], 3, 3)}
-            placeholder="例如 create:mixing"
-          />
+        <label className="section-label bench-type-label">配方类型</label>
+        {/* D（T-117）：类型选择器换成真正的下拉（此前是 <input list=datalist>：
+            datalist 按输入框当前值做前缀过滤，已选中 minecraft:crafting_shaped 时
+            打开列表只剩它自己一行，这才是「只有一行」的根因） */}
+        <div className="bench-type-field">
+          <TypeSelect disabled={!!pilotDraft} disabledReason="草稿打开时不能切换类型（先取消草稿）" />
         </div>
         {typeError ? (
           <span className="note-error" title={typeError}>
             配方类型列表加载失败（不是「没有类型」）：{typeError}
           </span>
         ) : null}
-        <datalist id="bench-type-options">
-          {summaries.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.displayName} · {s.capability === 'sugar' ? '✓ 语法糖' : s.capability === 'compatible' ? '✓ 兼容' : '✗ 不支持'}
-            </option>
-          ))}
-          <option value={GENERIC}>⚙ 通用 / 任意模组配方</option>
-        </datalist>
         <span
           className={`badge${pilotDraft ? ' badge-accent' : isGeneric && !pilotType ? ' badge-warn' : ''}`}
           title={pilotDraft ? MODE_NOTES.structured : pilotType ? MODE_NOTES.pilotIdle : MODE_NOTES.generic}
         >
-          {pilotDraft ? '结构化编辑' : pilotType ? '试点类型 · 未载入' : '通用模式'}
+          {pilotDraft ? '结构化编辑' : pilotType ? '未载入' : '通用模式'}
         </span>
         {/* D2：写盘目标常驻可见——任何时候都能回答"这一次提交会写到哪" */}
         <span className={`write-target${pilotDraft ? ' is-draft' : ''}`} title={writeTarget.detail}>
@@ -267,7 +234,6 @@ export function BenchView(): JSX.Element {
               typePickOpen ? (
                 <NewDraftTypePicker
                   summaries={summaries}
-                  pilotTypes={pilotTypes}
                   currentTypeId={bench.typeId}
                   onPick={(s) => {
                     useBenchStore.getState().setTypeId(s.id, s.layoutKind)
@@ -275,7 +241,6 @@ export function BenchView(): JSX.Element {
                     void startBlankDraft(s.id)
                   }}
                   onCancel={() => setTypePickOpen(false)}
-                  onOpenSettings={() => useAppStore.getState().setSettingsOpen(true)}
                 />
               ) : (
                 <StartHerePanel entries={entryStates} onPick={onPickEntry} />

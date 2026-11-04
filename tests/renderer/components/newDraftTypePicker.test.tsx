@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/** 第 116 批 A-4：新建前选类型 */
+/** 第 116 批 A-4 新建前选类型；T-117 白名单废除：所有类型都可选，不再有置灰行 */
 import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -11,7 +11,7 @@ afterEach(cleanup)
 const rows = [
   {
     id: 'minecraft:crafting_shaped',
-    displayName: '有序合成',
+    displayName: '有序合成（3×3）',
     modId: 'minecraft',
     modDisplayName: 'Minecraft',
     layoutKind: 'shaped',
@@ -25,7 +25,7 @@ const rows = [
   },
   {
     id: 'mekanism:crushing',
-    displayName: '粉碎',
+    displayName: 'mekanism:crushing',
     modId: 'mekanism',
     modDisplayName: 'Mekanism',
     layoutKind: 'single_io',
@@ -42,22 +42,19 @@ const rows = [
 const setup = (overrides: Partial<Parameters<typeof NewDraftTypePicker>[0]> = {}) => {
   const onPick = vi.fn()
   const onCancel = vi.fn()
-  const onOpenSettings = vi.fn()
   render(
     <NewDraftTypePicker
       summaries={rows}
-      pilotTypes={['minecraft:crafting_shaped']}
       currentTypeId="minecraft:crafting_shaped"
       onPick={onPick}
       onCancel={onCancel}
-      onOpenSettings={onOpenSettings}
       {...overrides}
     />
   )
-  return { onPick, onCancel, onOpenSettings }
+  return { onPick, onCancel }
 }
 
-describe('A-4 新建前选类型', () => {
+describe('A-4 新建前选类型（T-117 后：全部可选）', () => {
   it('常驻「当前类型」标签，选项来自 schema:list', () => {
     setup()
     expect(screen.getByText(/当前类型：有序合成/)).toBeTruthy()
@@ -65,22 +62,20 @@ describe('A-4 新建前选类型', () => {
     expect(screen.getByText('mekanism:crushing')).toBeTruthy()
   })
 
-  it('试点白名单内的类型可点；点击回传该 summary', () => {
+  it('每一行都有「用这个类型」按钮；点击回传该 summary', () => {
     const { onPick } = setup()
-    fireEvent.click(screen.getByRole('button', { name: '用这个类型' }))
+    const buttons = screen.getAllByRole('button', { name: '用这个类型' })
+    expect(buttons).toHaveLength(2) // 白名单废除后两行都可点
+    fireEvent.click(buttons[1])
     expect(onPick).toHaveBeenCalledTimes(1)
-    expect(onPick.mock.calls[0][0].id).toBe('minecraft:crafting_shaped')
+    expect(onPick.mock.calls[0][0].id).toBe('mekanism:crushing')
   })
 
-  it('不在白名单的类型：置灰但可见，并给「去设置开启」', () => {
-    const { onOpenSettings } = setup()
-    const row = document.querySelector('[data-type-id="mekanism:crushing"]') as HTMLElement
-    expect(row).not.toBeNull()
-    expect(row.className).toContain('is-disabled')
-    expect(row.textContent).toContain('当前不在试点白名单')
-    expect(screen.getAllByRole('button', { name: '用这个类型' })).toHaveLength(1) // 只有试点那一行有
-    fireEvent.click(screen.getByRole('button', { name: '去设置开启' }))
-    expect(onOpenSettings).toHaveBeenCalledTimes(1)
+  it('没有任何置灰行与「去设置开启」（开关已不存在）', () => {
+    setup()
+    expect(document.querySelectorAll('.type-pick-row.is-disabled')).toHaveLength(0)
+    expect(screen.queryByRole('button', { name: '去设置开启' })).toBeNull()
+    expect(screen.queryByText(/不在试点白名单/)).toBeNull()
   })
 
   it('过滤框按名称 / ID 过滤；无结果时给说明', () => {

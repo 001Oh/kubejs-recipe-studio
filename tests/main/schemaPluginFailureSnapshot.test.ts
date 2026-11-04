@@ -34,7 +34,17 @@ vi.mock('electron', () => ({
 const ROOT = mkdtempSync(join(tmpdir(), 'fix03-'))
 const PLUGIN_DIR_REL = join('.recipe-studio', 'plugins')
 const TYPE_ID = 'rt:only'
-const PILOT_IDS = ['minecraft:crafting_shaped', 'minecraft:crafting_shapeless', 'create:mixing']
+/** 内置类型（T-117 起为原版家族 8 项；无 create 系） */
+const PILOT_IDS = [
+  'minecraft:crafting_shaped',
+  'minecraft:crafting_shapeless',
+  'minecraft:stonecutting',
+  'minecraft:smithing_transform',
+  'minecraft:smelting',
+  'minecraft:blasting',
+  'minecraft:smoking',
+  'minecraft:campfire_cooking'
+]
 
 function makePack(tag: string): string {
   return mkdtempSync(join(ROOT, `${tag}-`))

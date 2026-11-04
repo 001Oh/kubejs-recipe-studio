@@ -36,11 +36,6 @@ export interface LoadedDraft {
   banners: { level: 'info' | 'warn'; text: string }[]
 }
 
-/** 试点开关：只有 ui.benchV2 明确列出该类型才走新链路；undefined / 空数组 = 完全回旧路径 */
-export function pilotEnabled(benchV2: readonly string[] | undefined, typeId: string): boolean {
-  return Array.isArray(benchV2) && benchV2.includes(typeId)
-}
-
 function quantity(raw: number | string | undefined): SlotValue['count'] {
   if (raw === undefined) return undefined
   return typeof raw === 'string' ? Number(raw) : raw

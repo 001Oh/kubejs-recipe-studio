@@ -1061,6 +1061,12 @@
   align-items: flex-start;
 }
 
+/* T-117 E：空列表的显式入口 */
+.pilot-list-add-btn {
+  border: 1px dashed var(--line-strong);
+  color: var(--fg-muted);
+}
+
 .pilot-list-row,
 .pilot-list-add {
   display: flex;
@@ -1542,4 +1548,108 @@
   white-space: pre-wrap;
   word-break: break-all;
   overflow: auto;
+}
+
+/* T-117 D：类型选择器（此前 panels/TypeSelect.tsx 从未被挂载、样式从未写过，
+   工作台用的是 <input list=datalist>，datalist 按当前值前缀过滤 → 只剩一行） */
+
+.bench-type-field {
+  position: relative;
+}
+
+.type-select {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.type-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.type-open {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.type-popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + var(--sp-1));
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  width: min(420px, calc(100vw - var(--sp-8)));
+  padding: var(--sp-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-2);
+}
+
+.type-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.type-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+}
+
+.type-row.on {
+  border-color: var(--line-strong);
+  background: var(--bg-inset);
+}
+
+.type-row.current {
+  border-color: var(--accent);
+}
+
+.type-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.cap-ok {
+  color: var(--ok);
+  border-color: var(--ok-line);
+}
+
+.cap-warn {
+  color: var(--warn);
+  border-color: var(--warn-line);
+}
+
+.cap-bad {
+  color: var(--err);
+  border-color: var(--err-line);
+}
+
+.badge.pin {
+  margin-left: var(--sp-1);
+  color: var(--accent);
+  border-color: var(--accent);
 }

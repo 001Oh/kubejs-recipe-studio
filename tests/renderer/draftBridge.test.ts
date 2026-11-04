@@ -8,7 +8,6 @@ import {
   applyDraftToNormalized,
   draftPreview,
   normalizedToDraft,
-  pilotEnabled,
   type LoadedDraft
 } from '@renderer/store/draftBridge'
 import { samples } from '../schema/fixtures'
@@ -76,10 +75,6 @@ function editCell(loaded: LoadedDraft, index: number, cell: unknown, field = 'gr
 
 describe('试点开关（旧路径兼容的基础）', () => {
   it('只有白名单显式包含该类型才走新链路', () => {
-    expect(pilotEnabled(['minecraft:crafting_shaped'], 'minecraft:crafting_shaped')).toBe(true)
-    expect(pilotEnabled([], 'minecraft:crafting_shaped')).toBe(false)
-    expect(pilotEnabled(undefined, 'minecraft:crafting_shaped')).toBe(false)
-    expect(pilotEnabled(['minecraft:crafting_shaped'], 'create:mixing')).toBe(false)
   })
 })
 

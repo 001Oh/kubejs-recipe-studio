@@ -186,31 +186,14 @@ export function SettingsView(): JSX.Element {
         <section className="set-card">
           <header className="set-head">
             <Icon name="bench" size={14} />
-            <h3>工作台试点</h3>
+            <h3>工作台模式</h3>
           </header>
           <div className="settings-row">
-            {(
-              [
-                ['minecraft:crafting_shaped', '有序合成'],
-                ['minecraft:crafting_shapeless', '无序合成'],
-                ['create:mixing', 'Create 混合']
-              ] as const
-            ).map(([typeId, label]) => {
-              const on = (ui.benchV2 ?? []).includes(typeId)
-              return (
-                <button
-                  key={typeId}
-                  className={`chip${on ? ' on' : ''}`}
-                  title="关闭后该类型完全回到旧工作台链路（试点开关）"
-                  onClick={() => {
-                    const current = ui.benchV2 ?? []
-                    patchUi({ benchV2: on ? current.filter((t) => t !== typeId) : [...current, typeId] })
-                  }}
-                >
-                  试点工作台：{label} {on ? '开' : '关'}
-                </button>
-              )
-            })}
+            {/* T-117：试点白名单已废除——结构化编辑的可用性只由「类型在注册表里有 schema」决定，
+                不再需要用户手工开关；这里只保留说明文案与三入口清单。 */}
+            <p className="settings-hint">
+              配方类型直接在工作台顶栏的「配方类型」选择器里选；有 schema 的类型即可结构化编辑。
+            </p>
           </div>
           <div className="settings-hint settings-modes">
             {/* D1：这段文案与工作台空态面板、徽标 hover 共用同一份定义（views/bench/editModes.ts） */}

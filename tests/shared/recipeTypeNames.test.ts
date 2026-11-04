@@ -26,4 +26,21 @@ describe('recipeTypeNameZh：配方类型中文名三级解析', () => {
   it('无冒号的裸 id：走尾部映射或 fallback', () => {
     expect(recipeTypeNameZh('crafting_shaped', 'x')).toBe('x')
   })
+
+  // T-117 实机验收发现：smithing_transform 在真实下拉里渲染成拉丁文「smithing transform」
+  // （tailOf 按首个冒号切分，tail 是 smithing_transform 整体，`smithing: '锻造'` 命中不了）。
+  // 该用例对内置 8 项逐条断言「不给 fallback 也必须是中文」，防止同类遗漏。
+  it('内置原版家族 8 项：不传 fallback 也必须渲染成中文', () => {
+    const BUILTIN_IDS = [
+      'minecraft:blasting',
+      'minecraft:campfire_cooking',
+      'minecraft:crafting_shaped',
+      'minecraft:crafting_shapeless',
+      'minecraft:smelting',
+      'minecraft:smithing_transform',
+      'minecraft:smoking',
+      'minecraft:stonecutting'
+    ]
+    for (const id of BUILTIN_IDS) expect(recipeTypeNameZh(id), id).toMatch(/[\u4e00-\u9fa5]/u)
+  })
 })

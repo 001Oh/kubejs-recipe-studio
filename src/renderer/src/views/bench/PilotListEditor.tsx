@@ -144,6 +144,14 @@ function SlotGroup({
   values: SlotValue[]
   withChance: boolean
 }): JSX.Element {
+  // T-117 E：空列表必须有显式入口。此前只有 multiple 字段带一个「添加」拖放槽，
+  // 单值字段（smithing 的 template/base/addition、熔炼家族的 ingredient）在空白草稿里
+  // 一行都不渲染，用户面对的是"这块区域什么都没有"，只能靠双击找不到目标。
+  const appendEmpty = (): void => {
+    const store = useBenchStore.getState()
+    const current = asList(store.bench.values[field.key])
+    store.setValue(field.key, [...current, { kind: 'item', id: '', count: 1 }])
+  }
   return (
     <section className="pilot-list-group">
       <header className="bench-row">
@@ -152,6 +160,7 @@ function SlotGroup({
         </strong>
         <span className="aux mono">{field.key}</span>
         {field.multiple ? <span className="badge">可多值</span> : <span className="badge">单值</span>}
+        {field.required ? <span className="badge badge-warn">必填</span> : null}
       </header>
       <div className="pilot-list-rows">
         {values.map((slot, index) => (
@@ -166,6 +175,11 @@ function SlotGroup({
           />
         ))}
         {field.multiple ? <AppendSlot fieldKey={field.key} kind={field.kind} /> : null}
+        {values.length === 0 ? (
+          <button className="btn btn-ghost btn-sm pilot-list-add-btn" onClick={appendEmpty} title={`在「${fieldLabel(field.key)}」里加一项`}>
+            + 添加一项
+          </button>
+        ) : null}
       </div>
     </section>
   )

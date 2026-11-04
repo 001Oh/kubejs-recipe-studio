@@ -36,7 +36,17 @@ const ROOT = mkdtempSync(join(tmpdir(), 'fix02-'))
 const PLUGIN_DIR_REL = join('.recipe-studio', 'plugins')
 const TYPE_ID = 'rt:only'
 const PATTERN = 'foo:bar/*'
-const PILOT_IDS = ['minecraft:crafting_shaped', 'minecraft:crafting_shapeless', 'create:mixing']
+/** 内置类型（T-117 起为原版家族 8 项；无 create 系） */
+const PILOT_IDS = [
+  'minecraft:crafting_shaped',
+  'minecraft:crafting_shapeless',
+  'minecraft:stonecutting',
+  'minecraft:smithing_transform',
+  'minecraft:smelting',
+  'minecraft:blasting',
+  'minecraft:smoking',
+  'minecraft:campfire_cooking'
+]
 
 /** 新建一个整合包目录（默认**不带**插件目录） */
 function makePack(tag: string): string {

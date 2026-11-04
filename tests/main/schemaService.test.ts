@@ -11,13 +11,23 @@ vi.mock('electron', () => ({ app: { getPath: () => H.userData, getVersion: () =>
 mkdirSync(H.userData, { recursive: true })
 
 describe('P0 schema 服务', () => {
-  it('schema:list 来源是内置试点 schema，按 id 稳定排序', async () => {
+  it('schema:list 来源是内置原版家族 schema，按 id 稳定排序', async () => {
     const service = await import('@main/schema/service')
     service.invalidateSchemaSnapshot()
     const list = await service.schemaSummaries()
     const ids = list.map((s) => s.id)
     expect(ids).toEqual([...ids].sort((a, b) => a.localeCompare(b, 'en')))
-    expect(ids).toEqual(['create:mixing', 'minecraft:crafting_shaped', 'minecraft:crafting_shapeless'])
+    // T-117：试点制度废除，内置只留原版家族 8 项（create 系走 KJS 插件加载）
+    expect(ids).toEqual([
+      'minecraft:blasting',
+      'minecraft:campfire_cooking',
+      'minecraft:crafting_shaped',
+      'minecraft:crafting_shapeless',
+      'minecraft:smelting',
+      'minecraft:smithing_transform',
+      'minecraft:smoking',
+      'minecraft:stonecutting'
+    ])
     expect(list.every((s) => s.source === 'builtin')).toBe(true)
     expect(list.every((s) => typeof s.capability === 'string' && typeof s.channel === 'string')).toBe(true)
   })
@@ -34,7 +44,7 @@ describe('P0 schema 服务', () => {
   it('coverage 的分母/分子自洽，且通道分布之和等于总数', async () => {
     const service = await import('@main/schema/service')
     const report = await service.coverage()
-    expect(report.totalTypes).toBe(3)
+    expect(report.totalTypes).toBe(8)
     expect(report.structurable + report.genericOnly + report.unsupported).toBe(report.totalTypes)
     const sum = report.channelCounts['kubejs-sugar'] + report.channelCounts['datapack-json'] + report.channelCounts['event-custom']
     expect(sum).toBe(report.totalTypes)

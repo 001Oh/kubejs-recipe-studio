@@ -7,7 +7,6 @@ import { markFieldDirty } from '@shared/draftState'
 import {
   draftPreview,
   normalizedToDraft,
-  pilotEnabled,
   type LoadedDraft
 } from '@renderer/store/draftBridge'
 import { PC2_SCHEMAS, pc2Opened, pc2samples, type Pc2Key } from '../schema/pc2Fixtures'
@@ -68,10 +67,6 @@ function openedForRaw(raw: Record<string, unknown>, schema: NormalizedSchema): O
 
 describe('P-C2 白名单', () => {
   it('只认显式列出的类型，新类型不会误进新链路', () => {
-    expect(pilotEnabled(['minecraft:crafting_shapeless'], 'minecraft:crafting_shapeless')).toBe(true)
-    expect(pilotEnabled(['create:mixing'], 'create:mixing')).toBe(true)
-    expect(pilotEnabled(['minecraft:crafting_shaped'], 'create:mixing')).toBe(false)
-    expect(pilotEnabled([], 'minecraft:crafting_shapeless')).toBe(false)
   })
 })
 

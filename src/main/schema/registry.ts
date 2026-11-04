@@ -27,10 +27,10 @@ import { logger } from '../logger'
 import { decideForSchema, type CapabilityFacts } from './capability'
 import { displayNameForField } from './naming'
 
-export type SchemaLayer = 'plugin' | 'builtin' | 'jar' | 'inferred'
+export type SchemaLayer = 'plugin' | 'builtin' | 'l0' | 'jar' | 'inferred'
 export type MergeFacts = CapabilityFacts
 
-const LAYERS: SchemaLayer[] = ['plugin', 'builtin', 'jar', 'inferred']
+const LAYERS: SchemaLayer[] = ['plugin', 'builtin', 'l0', 'jar', 'inferred']
 const layerMaps = new Map<SchemaLayer, Map<string, RecipeTypeSchema>>(LAYERS.map((l) => [l, new Map()]))
 const effective = new Map<string, RecipeTypeSchema>()
 /** 钉住的 schema 落盘在 userData/customRecipeTypes.json；内存里另存一份，钉住后不再被任何层覆盖。 */

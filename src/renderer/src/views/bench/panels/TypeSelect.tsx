@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import type { SchemaSummary } from '@shared/ipc'
+import { recipeTypeNameZh } from '@shared/recipeTypeNames'
 import { useBenchStore } from '../../../store/benchStore'
 import { GENERIC_TYPE_ID, useBenchUiStore } from '../benchUiStore'
 
@@ -45,7 +46,14 @@ const GENERIC_ROW: SchemaSummary = {
   group: 'generic'
 }
 
-export function TypeSelect(): JSX.Element {
+export function TypeSelect({
+  disabled = false,
+  disabledReason
+}: {
+  /** 草稿打开时禁止切换类型：切了会和草稿里的槽位结构对不上 */
+  disabled?: boolean
+  disabledReason?: string
+} = {}): JSX.Element {
   const summaries = useBenchUiStore((s) => s.summaries)
   const loaded = useBenchUiStore((s) => s.summariesLoaded)
   const applyType = useBenchUiStore((s) => s.applyType)
@@ -57,14 +65,20 @@ export function TypeSelect(): JSX.Element {
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
+    // 清单未加载时补一次：类型选择器是唯一入口，不能因为别处没触发就一直空着
+    if (!useBenchUiStore.getState().summariesLoaded) void useBenchUiStore.getState().loadSummaries()
+  }, [])
+
+  useEffect(() => {
     const focus = (): void => {
+      if (disabled) return
       setOpen(true)
       useBenchUiStore.getState().setWriteOpen(false)
       inputRef.current?.focus()
     }
     window.addEventListener('studio:focus-type-select', focus)
     return () => window.removeEventListener('studio:focus-type-select', focus)
-  }, [])
+  }, [disabled])
 
   const rows = useMemo(() => {
     const q = text.trim().toLowerCase()
@@ -88,12 +102,13 @@ export function TypeSelect(): JSX.Element {
       <div className="type-trigger">
         <button
           className="btn type-open"
+          disabled={disabled}
           onClick={() => setOpen((v) => !v)}
-          title="切换配方类型（Ctrl+E）"
+          title={disabled ? disabledReason ?? '草稿打开时不能切换类型' : '切换配方类型（Ctrl+E）'}
           aria-expanded={open}
           aria-haspopup="listbox"
         >
-          {current?.displayName ?? schema?.displayName ?? (typeId === GENERIC_TYPE_ID ? '⚙ 通用配方' : typeId)}
+          {current?.displayName ?? schema?.displayName ?? (typeId === GENERIC_TYPE_ID ? '⚙ 通用配方' : recipeTypeNameZh(typeId))}
         </button>
         {current ? (
           <span className={`badge ${CAPABILITY_TONE[current.capability]}`}>{CAPABILITY_LABEL[current.capability]}</span>
@@ -156,7 +171,8 @@ export function TypeSelect(): JSX.Element {
               >
                 <span className="type-row-main">
                   <span className="item-zh">
-                    {row.displayName}
+                    {/* T-117：插件新增的类型没有中文 displayName 时，用同一份中文映射兜底 */}
+                    {recipeTypeNameZh(row.id, row.displayName)}
                     {row.pinned ? <span className="badge pin">钉</span> : null}
                   </span>
                   <span className="item-sub">{row.id}</span>

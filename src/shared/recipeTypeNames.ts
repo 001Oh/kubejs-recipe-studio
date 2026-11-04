@@ -20,6 +20,10 @@ const TAIL_ZH: Record<string, string> = {
   campfire_cooking: '营火烹饪',
   stonecutting: '切石',
   smithing: '锻造',
+  // 第 117 批实机验收：smithing_transform 无映射渲染成拉丁文「smithing transform」，
+  // 违反「所有配方类型都有中文」——补整 id 与尾部两级映射
+  smithing_transform: '锻造（模板改造）',
+  smithing_trim: '锻造（盔甲纹饰）',
   cutting: '切割',
   crushing: '粉碎',
   milling: '研磨',
@@ -35,6 +39,7 @@ const TAIL_ZH: Record<string, string> = {
   mechanical_crafting: '机械合成',
   item_application: '物品应用',
   sandpaper_polishing: '砂纸打磨',
+  brewing: '酿造',
   melting: '熔融',
   casting_table: '铸造台',
   casting_basin: '铸造盆',
@@ -123,6 +128,8 @@ const RECIPE_TYPE_NAMES_ZH: Record<string, string> = {
   'minecraft:smoking': '烟熏',
   'minecraft:campfire_cooking': '营火烹饪',
   'minecraft:smithing': '锻造',
+  'minecraft:smithing_transform': '锻造（模板改造）',
+  'minecraft:smithing_trim': '锻造（盔甲纹饰）',
   'create:mixing': '机械动力 · 动力搅拌器',
   'create:mechanical_crafting': '机械动力 · 动力合成器',
   'create:crushing': '机械动力 · 粉碎轮',

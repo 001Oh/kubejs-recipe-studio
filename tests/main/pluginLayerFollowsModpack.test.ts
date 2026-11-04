@@ -41,8 +41,17 @@ const PACK_B = join(ROOT, 'packB')
 const PLUGIN_DIR_REL = join('.recipe-studio', 'plugins')
 const TYPE_ID = 'rt:only'
 const PLUGIN_ID = 'fix01-plugin'
-/** 内置试点类型（`shared/pilotSchemas.ts` 中恰好这三个） */
-const PILOT_IDS = ['minecraft:crafting_shaped', 'minecraft:crafting_shapeless', 'create:mixing']
+/** 内置类型（T-117 起为原版家族 8 项；无 create 系） */
+const PILOT_IDS = [
+  'minecraft:crafting_shaped',
+  'minecraft:crafting_shapeless',
+  'minecraft:stonecutting',
+  'minecraft:smithing_transform',
+  'minecraft:smelting',
+  'minecraft:blasting',
+  'minecraft:smoking',
+  'minecraft:campfire_cooking'
+]
 
 function writePluginInto(packPath: string): void {
   const dir = join(packPath, PLUGIN_DIR_REL)
@@ -178,7 +187,7 @@ describe('FIX-01：插件层跟随当前整合包', () => {
     expect(summary?.source).toBe('plugin')
   })
 
-  it('T3：换包后内置试点 Schema 三个类型均不丢失', async () => {
+  it('T3：换包后内置类型（原版家族）不丢失', async () => {
     const { state, ids } = await boot('A')
     state.setCurrentModpack(modpack(PACK_B))
     const after = await ids()

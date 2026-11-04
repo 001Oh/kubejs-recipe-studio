@@ -332,8 +332,6 @@ export interface UiState {
   generationPreference: GenerationPreference
   showVirtualItems: boolean
   browseMode: 'list' | 'detail'
-  /** P-C1 试点：走新草稿链路的配方类型白名单（空数组 = 完全回旧路径） */
-  benchV2?: string[]
   /**
    * T-25：上次使用的整合包根目录（冷启动恢复用）。
    * 只存路径与检测到的名字，不存任何全局/绝对路径常量；空 = 没有可恢复的包。

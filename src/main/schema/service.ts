@@ -29,6 +29,7 @@ import type { RecipeSlotSchema, RecipeTypeSchema } from '../../shared/types'
 import type { SchemaSummary } from '../../shared/ipc'
 import type { NormalizedSchema, NormalizedSchemaSlot } from '../../shared/schemaModel'
 import { PILOT_SCHEMAS } from '../../shared/pilotSchemas'
+import { activeL0Schemas } from '../../data/recipeTypes/materialize'
 import { resolveSugarTarget } from '../codegen/emitScript'
 import { getCurrentModpack } from '../modpack/state'
 import { allRecords, typeUniverse } from '../recipes/recipeIndex'
@@ -150,6 +151,9 @@ export async function ensureSchemas(): Promise<void> {
       const prevPluginLayer = snapshotLayer('plugin')
       clearSchemas()
       putMany('builtin', Object.values(PILOT_SCHEMAS).map(pilotToSchema))
+      // U-22/T-117：L0 内置精校库——包内容驱动（modId 已装且装有 kubejs 才激活）
+      const l0 = activeL0Schemas(getCurrentModpack())
+      if (l0.length > 0) putMany('l0', l0.map(pilotToSchema))
       const pluginLayer = fetchLayer('plugin')
       replaceLayer('plugin', pluginLayer.ok ? pluginLayer.schemas : prevPluginLayer)
       await loadPinned()

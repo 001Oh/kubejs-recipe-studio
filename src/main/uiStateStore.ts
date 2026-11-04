@@ -28,8 +28,6 @@ export const DEFAULT_UI_STATE: UiState = {
   generationPreference: 'auto',
   showVirtualItems: false,
   browseMode: 'list',
-  // 第 7 条：新装默认开启「有序合成 / 无序合成」两个试点模式；已有 uiState 里存了值就沿用存的
-  benchV2: ['minecraft:crafting_shaped', 'minecraft:crafting_shapeless'],
   maximized: false,
   x: null,
   y: null,
@@ -70,7 +68,6 @@ export function loadUiState(): UiState {
           : 'auto',
       showVirtualItems: bool(raw.showVirtualItems, false),
       browseMode: raw.browseMode === 'detail' ? 'detail' : 'list',
-      benchV2: Array.isArray(raw.benchV2) ? (raw.benchV2 as unknown[]).filter((v): v is string => typeof v === 'string') : [],
       // T-25：恢复用的包标识。非字符串/空串一律当「没有」，避免把脏值当成可恢复路径。
       ...(typeof raw.lastModpackPath === 'string' && raw.lastModpackPath.trim()
         ? { lastModpackPath: raw.lastModpackPath.trim() }

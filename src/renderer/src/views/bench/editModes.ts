@@ -75,7 +75,7 @@ export interface EntryState {
 export interface EntryContext {
   /** 已导入整合包（且索引可用） */
   hasModpack: boolean
-  /** 当前类型在试点白名单里 */
+  /** T-117：当前类型在注册表里有 schema（原「试点白名单」已废除，语义改为「可结构化」） */
   pilotType: boolean
 }
 
@@ -90,7 +90,11 @@ export function resolveEntryStates(ctx: EntryContext): EntryState[] {
       return { ...entry, disabled: true, reason: NEED_MODPACK }
     }
     if (entry.id === 'create' && !ctx.pilotType) {
-      return { ...entry, disabled: true, reason: '该类型不支持结构化编辑，可切换类型（有序合成 / 无序合成 / Create 混合）' }
+      return {
+        ...entry,
+        disabled: true,
+        reason: '该类型不支持结构化编辑（注册表里没有它的 schema）：在上方「配方类型」里换一个带 schema 的类型'
+      }
     }
     return { ...entry, disabled: false, reason: '' }
   })
