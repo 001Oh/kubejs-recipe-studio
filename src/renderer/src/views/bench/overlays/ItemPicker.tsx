@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import type { ItemHit, SlotKind } from '@shared/types'
+import { displayName, isLocalizedName } from '@shared/itemName'
 import { SEARCH_DEBOUNCE_MS } from '@shared/constants'
 import { parseSlotInput } from '../../../store/slotUtils'
 import { call } from '../../../api'
@@ -134,8 +135,13 @@ export function ItemPicker(): JSX.Element | null {
             />
             <span className="panel-row-names">
               <span className="item-zh">
-                {hit.item.nameZh}
+                {displayName(hit.item)}
                 {favorites.includes(hit.item.id) ? <span className="star on">★</span> : null}
+                {isLocalizedName(hit.item) ? null : (
+                  <span className="badge name-i18n-missing" title="该物品没有中文名，显示的是原名">
+                    未汉化
+                  </span>
+                )}
               </span>
               <span className="item-sub">{hit.item.id}</span>
             </span>

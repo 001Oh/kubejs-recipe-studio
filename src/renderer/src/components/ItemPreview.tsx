@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react'
 import { usePreviewStore, modOf, previewCacheGet, previewCacheSet, SUPPRESS_AFTER_SCROLL_MS, type PreviewInfo } from '@renderer/store/previewStore'
 import { call } from '../api'
+import { displayName } from '@shared/itemName'
 import { flipOf } from './previewFlip'
 
 
@@ -16,7 +17,7 @@ export function ItemPreview(): JSX.Element | null {
   const id = usePreviewStore((s) => s.id)
   const anchor = usePreviewStore((s) => s.anchor)
   const suppressFor = usePreviewStore((s) => s.suppressFor)
-  const [info, setInfo] = useState<{ nameZh: string; iconKey?: string; hasIcon?: boolean } | null>(null)
+  const [info, setInfo] = useState<{ nameZh: string; nameEn?: string; iconKey?: string; hasIcon?: boolean } | null>(null)
   const [extra, setExtra] = useState<PreviewInfo | null>(null)
 
   useEffect(() => {
@@ -38,8 +39,11 @@ export function ItemPreview(): JSX.Element | null {
         const next = { mod: modOf(id), recipeCount: Number.isFinite(total) ? total : 0 }
         previewCacheSet(id, next)
         setExtra(next)
-        const nameZh = (items as { nameZh?: string } | null)?.nameZh
-        if (nameZh) setInfo({ nameZh })
+        const entry = items as { nameZh?: string; nameEn?: string } | null
+        // A-3：没有中文名时用原名兜底（以前 nameZh 为空就直接显示 ID）
+        if (entry && ((entry.nameZh ?? '') !== '' || (entry.nameEn ?? '') !== '')) {
+          setInfo({ nameZh: entry.nameZh ?? '', nameEn: entry.nameEn ?? '' })
+        }
       } catch {
         if (alive) setExtra({ mod: modOf(id), recipeCount: 0 })
       }
@@ -78,7 +82,7 @@ export function ItemPreview(): JSX.Element | null {
 
   return (
     <div className="item-preview" role="tooltip" style={{ left: pos.x, top: pos.y }}>
-      <div className="item-preview-name">{info?.nameZh ?? id}</div>
+      <div className="item-preview-name">{info ? displayName({ id, ...info }) : id}</div>
       <div className="item-preview-id mono">{id}</div>
       <div className="item-preview-meta">
         <span className="chip">{extra?.mod ?? modOf(id)}</span>

@@ -17,6 +17,7 @@ import { WriteDialog } from './bench/panels/WriteDialog'
 import { useBenchInteractions } from './bench/useBenchInteractions'
 import { useBenchUiStore } from './bench/benchUiStore'
 import { StartHerePanel } from './bench/StartHerePanel'
+import { NewDraftTypePicker } from './bench/NewDraftTypePicker'
 import { MODE_NOTES, resolveEntryStates, writeTargetOf, type EditEntryId } from './bench/editModes'
 import { Icon } from '../components/Icon'
 import './views.css'
@@ -43,17 +44,20 @@ export function BenchView(): JSX.Element {
   // 第 4 条：清空是破坏性操作，改两步内联确认（项目 lint 禁 window.confirm）
   const [clearArmed, setClearArmed] = useState(false)
   const [newDraftBusy, setNewDraftBusy] = useState(false)
+  // 第 116 批 A-4：新建前先选类型（类型来自 schema:list，非试点类型可见但置灰）
+  const [typePickOpen, setTypePickOpen] = useState(false)
   // B 方案：从零新建结构化配方（当前类型是试点类型、且还没有草稿时可用）
-  const startBlankDraft = async (): Promise<void> => {
+  // typeId 显式传入：类型选择器刚改完类型时，闭包里的 bench.typeId 还是旧值
+  const startBlankDraft = async (typeId: string = bench.typeId): Promise<void> => {
     if (newDraftBusy) return
     setNewDraftBusy(true)
     try {
-      const schema = await callOrThrow('schema:get', { typeId: bench.typeId })
+      const schema = await callOrThrow('schema:get', { typeId })
       if (!schema) {
         toast('该类型没有可用 schema，无法进入结构化编辑', 'warn')
         return
       }
-      const draft = createBlankDraft(bench.typeId, schema as never)
+      const draft = createBlankDraft(typeId, schema as never)
       // P2-3：新建空白草稿是会话边界，清空 undo/redo，不让 Ctrl+Z 带回上一个配方的状态
       useBenchStore.setState({ past: [], future: [], draft, bench: draft.workbench, draftConflict: null, loadedFrom: null })
       toast('已新建空白结构化配方：填好材料与产物后提交', 'success')
@@ -129,7 +133,8 @@ export function BenchView(): JSX.Element {
       return
     }
     if (id === 'create') {
-      void startBlankDraft()
+      // A-4：先选类型，再建草稿（不再用"当前类型"闷头新建）
+      setTypePickOpen(true)
       return
     }
     // ③ 快速导出：直接给出可填的字段，不让人先猜"在哪里填"
@@ -222,8 +227,8 @@ export function BenchView(): JSX.Element {
           <button
             className="btn btn-ghost tiny"
             disabled={newDraftBusy}
-            title="用当前类型新建一条空白结构化配方（不基于任何已有配方）"
-            onClick={() => void startBlankDraft()}
+            title="先选一个配方类型，再新建空白结构化配方（不基于任何已有配方）"
+            onClick={() => setTypePickOpen(true)}
           >
             {newDraftBusy ? '新建中…' : '新建结构化配方'}
           </button>
@@ -259,7 +264,22 @@ export function BenchView(): JSX.Element {
         ) : (
           <>
             {inputs.length === 0 && outputs.length === 0 ? (
-              <StartHerePanel entries={entryStates} onPick={onPickEntry} />
+              typePickOpen ? (
+                <NewDraftTypePicker
+                  summaries={summaries}
+                  pilotTypes={pilotTypes}
+                  currentTypeId={bench.typeId}
+                  onPick={(s) => {
+                    useBenchStore.getState().setTypeId(s.id, s.layoutKind)
+                    setTypePickOpen(false)
+                    void startBlankDraft(s.id)
+                  }}
+                  onCancel={() => setTypePickOpen(false)}
+                  onOpenSettings={() => useAppStore.getState().setSettingsOpen(true)}
+                />
+              ) : (
+                <StartHerePanel entries={entryStates} onPick={onPickEntry} />
+              )
             ) : null}
             <div className="bench-cols">
               <SlotColumn

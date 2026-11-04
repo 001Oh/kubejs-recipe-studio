@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import type { ItemEntry, RecipeIO, RecipeRecord } from '@shared/types'
 import { RECIPE_DETAIL_PAGE_SIZE, RECIPE_PAGE_SIZE } from '@shared/constants'
+import { displayName, isLocalizedName } from '@shared/itemName'
 import { call } from '../api'
 import { useAppStore, type BrowseTab } from '../store/appStore'
 import { ItemIcon } from '../components/ItemIcon'
@@ -141,9 +142,14 @@ export function BrowseView(): JSX.Element {
           size={32}
         />
         <div className="work-head-title">
-          <div className="work-title truncate" title={item?.nameZh ?? itemId}>
-            {item?.nameZh ?? itemId}
+          <div className="work-title truncate" title={item ? displayName(item) : itemId}>
+            {item ? displayName(item) : itemId}
           </div>
+          {item && !isLocalizedName(item) ? (
+            <span className="badge name-i18n-missing" title="该物品没有中文名，显示的是原名">
+              未汉化
+            </span>
+          ) : null}
           <div className="work-sub mono truncate" title={itemId}>
             {itemId}
           </div>

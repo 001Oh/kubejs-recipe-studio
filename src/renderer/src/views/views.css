@@ -501,6 +501,73 @@
   margin: 0;
 }
 
+/* 第 116 批 A-4：新建前选类型 */
+
+.type-pick-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.type-pick-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+}
+
+.type-pick-row.is-disabled {
+  background: var(--bg-inset);
+  border-style: dashed;
+}
+
+.type-pick-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 40%;
+  font-size: var(--fs-aux);
+  color: var(--fg);
+}
+
+.type-pick-row.is-disabled .type-pick-name {
+  color: var(--fg-muted);
+}
+
+.type-pick-id {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-badge);
+  color: var(--fg-subtle);
+}
+
+.type-pick-reason {
+  font-size: var(--fs-badge);
+  color: var(--warn);
+  white-space: nowrap;
+}
+
+/* 第 116 批 A-3：没有中文名（显示原名）时的标记，克制到不抢走物品名的注意力 */
+
+.name-i18n-missing {
+  margin-left: 6px;
+  border: 1px solid var(--line);
+  background: var(--bg-inset);
+  color: var(--fg-subtle);
+  font-size: var(--fs-badge);
+  font-weight: var(--fw-medium);
+  padding: 0 4px;
+  height: 16px;
+  line-height: 14px;
+  flex: 0 0 auto;
+}
+
 /* D1：设置页里的同一套入口文案（列表形态，信息密度比空态面板高） */
 
 .settings-modes p {

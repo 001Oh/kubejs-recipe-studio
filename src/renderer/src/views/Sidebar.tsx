@@ -9,6 +9,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { JSX } from 'react'
 import type { ItemHit } from '@shared/types'
 import { SIDEBAR_PAGE_SIZE, SIDEBAR_ROW_HEIGHT, SEARCH_DEBOUNCE_MS } from '@shared/constants'
+import { displayName, isLocalizedName } from '@shared/itemName'
 import { appendUnique, nextPageOffset, shouldPrefetch } from './sidebar/paging'
 import { useHoverPreview } from './sidebar/useHoverPreview'
 import { call } from '../api'
@@ -465,12 +466,22 @@ function SideRow({
       title={`${hit.item.nameZh}\n${hit.item.id}\n左键查看配方 · Alt+左键直达用途 · 中键吸取 · 拖拽放置`}
     >
       <ItemIcon
-        item={{ id: hit.item.id, name: hit.item.nameZh, iconKey: hit.item.iconKey, hasIcon: hit.item.hasIcon }}
+        item={{ id: hit.item.id, name: displayName(hit.item), iconKey: hit.item.iconKey, hasIcon: hit.item.hasIcon }}
         size={32}
       />
       <span className="item-row-names">
         <span className="item-zh">
-          <Highlight text={hit.item.nameZh} ranges={hit.highlights} field="nameZh" />
+          <Highlight
+            text={displayName(hit.item)}
+            ranges={hit.highlights}
+            field={isLocalizedName(hit.item) ? 'nameZh' : 'nameEn'}
+          />
+          {/* A-3：没有中文名时显示的是英文/其它语言名，必须标出来，别让人以为汉化坏了 */}
+          {isLocalizedName(hit.item) ? null : (
+            <span className="badge name-i18n-missing" title="该物品没有中文名，显示的是原名">
+              未汉化
+            </span>
+          )}
           {hit.item.verified ? (
             <span className="badge badge-ok item-verified" title="已在注册表中验证">
               ✓
