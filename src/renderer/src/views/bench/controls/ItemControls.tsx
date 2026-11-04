@@ -44,12 +44,21 @@ export function MultiSlotControl({ field, scope, renderRow }: ListProps): JSX.El
   const drop = useDroppable({ id: `slot:${appendId}` })
   const grid = prefersGrid(field, list.length)
   const capacity = field.max ?? 0
+  // P3-23a：行 key 用「值身份 + 出现序」，删除靠前行不使后续行复用别人的组件实例；
+  // 空值行没有身份，按 index 兜底（如 item id + 位置，冲突时回退 index）。
+  const seen = new Map<string, number>()
+  const rowKeys = list.map((slot, index) => {
+    if (!slot.id) return `index:${index}`
+    const ordinal = seen.get(slot.id) ?? 0
+    seen.set(slot.id, ordinal + 1)
+    return `${slot.id}#${ordinal}`
+  })
 
   return (
     <FieldShell field={field}>
       <div className={`slot-group${grid ? ' as-grid' : ''}`} data-orientation={field.orientation ?? 'horizontal'}>
         {list.map((slot, index) => (
-          <div className="slot-cell" key={index} data-empty={!slot.id}>
+          <div className="slot-cell" key={rowKeys[index]} data-empty={!slot.id}>
             {renderRow(index)}
             <button className="btn micro" title="移除该条目" onClick={() => clearAt(slotIdFor(field, scope, index))}>
               ✕

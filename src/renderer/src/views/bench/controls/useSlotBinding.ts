@@ -2,6 +2,7 @@
  * 槽位绑定：把「地址 + 当前值」换算成 ItemSlot 需要的回调集合。
  * 11 个控件共用这一份接线，吸取/激活/滚轮/双击/右键行为因此天然一致（规格 3.9.4 七态）。
  */
+import { useEffect } from 'react'
 import type { FieldKind, SlotValue } from '@shared/types'
 import { useAppStore } from '../../../store/appStore'
 import { useBenchStore } from '../../../store/benchStore'
@@ -11,17 +12,33 @@ import { placeEyedropper } from '../useBenchInteractions'
 
 /** ItemSlot 的 onClick 不带事件对象，用捕获阶段记下发车瞬间的修饰键 */
 let shiftHeld = false
-if (typeof window !== 'undefined') {
-  window.addEventListener(
-    'pointerdown',
-    (e: PointerEvent) => {
-      shiftHeld = e.shiftKey
-    },
-    true
-  )
-  window.addEventListener('keyup', (e: KeyboardEvent) => {
+let shiftUsers = 0
+let shiftPointerHandler: ((e: PointerEvent) => void) | null = null
+let shiftKeyHandler: ((e: KeyboardEvent) => void) | null = null
+
+/** P3-23b：首个使用方挂载时安装，最后一个卸载时移除；模块导入不再永久占用全局监听 */
+function acquireShiftListeners(): void {
+  shiftUsers += 1
+  if (shiftUsers !== 1 || typeof window === 'undefined') return
+  const onPointer = (e: PointerEvent): void => {
     shiftHeld = e.shiftKey
-  })
+  }
+  const onKeyUp = (e: KeyboardEvent): void => {
+    shiftHeld = e.shiftKey
+  }
+  shiftPointerHandler = onPointer
+  shiftKeyHandler = onKeyUp
+  window.addEventListener('pointerdown', onPointer, true)
+  window.addEventListener('keyup', onKeyUp)
+}
+
+function releaseShiftListeners(): void {
+  shiftUsers = Math.max(0, shiftUsers - 1)
+  if (shiftUsers !== 0 || !shiftPointerHandler || !shiftKeyHandler) return
+  window.removeEventListener('pointerdown', shiftPointerHandler, true)
+  window.removeEventListener('keyup', shiftKeyHandler)
+  shiftPointerHandler = null
+  shiftKeyHandler = null
 }
 
 export interface SlotBindingOptions {
@@ -67,6 +84,10 @@ export interface SlotBinding {
 }
 
 export function useSlotBinding(opts: SlotBindingOptions): SlotBinding {
+  useEffect(() => {
+    acquireShiftListeners()
+    return releaseShiftListeners
+  }, [])
   const eyedropper = useAppStore((s) => s.eyedropper)
   const activeSlotKey = useBenchStore((s) => s.bench.activeSlotKey)
   const setActiveSlot = useBenchStore((s) => s.setActiveSlot)

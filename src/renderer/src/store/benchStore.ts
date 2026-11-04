@@ -266,6 +266,8 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
     const b = get().bench
     get().snapshot()
     set({ bench: { ...b, modifiers: { ...(b.modifiers ?? {}), [key]: value } } })
+    // P3-23d：修饰符也是草稿内容，只改修饰符不应被 NO_CHANGES 拒绝
+    touchDirty(get, set, `modifiers.${key}`)
   },
 
   loadFromRecipe(record, layoutKind, typeId) {

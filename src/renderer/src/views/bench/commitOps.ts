@@ -18,11 +18,17 @@ import {
 } from './slotAddress'
 import { useBenchUiStore } from './benchUiStore'
 import { allFieldsFlat } from './fieldModel'
+import { canonicalStringify } from '@shared/canonicalJson'
 
+/**
+ * P3-23c：结构比较（键排序后序列化），键序不同不应判「无变化」→ 灌入多余撤销快照。
+ * canonicalStringify 对 undefined / 函数等非 JSON 值抛错，与旧实现的 catch 一致按「不同」处理；
+ * 两边同为 undefined 由 a === b 提前命中。
+ */
 function same(a: unknown, b: unknown): boolean {
   if (a === b) return true
   try {
-    return JSON.stringify(a) === JSON.stringify(b)
+    return canonicalStringify(a) === canonicalStringify(b)
   } catch {
     return false
   }
