@@ -250,6 +250,35 @@ function unwrapNested(value: unknown, ctx: Ctx, depth: number): void {
   classifyRecipeObject(value, ctx, depth + 1)
 }
 
+/**
+ * B120/D-03：解出条件包装（`forge:conditional` 等）的**内层配方对象与 type**。
+ *
+ * IO 提取侧的剥包装早已有（`unwrapNested`），缺的是类型归类这半边——record 长期把
+ * 上千条包装配方记成假类型。这里只认**精确键名** `recipe` / `recipes`（比提取侧的
+ * 词形匹配更严：归类错了比提取错更难察觉），且终点必须带合法 id 形态的 `type`，
+ * 否则返回 null 维持外层类型，不强行归类。`recipes` 数组形态取首元素。
+ * 深度：实包（Ad-Astra Giselle 兼容层）存在双层包装
+ * `forge:conditional → recipes[] → {conditions, recipe:{type…}}`，与 unwrapNested 同限 3 层。
+ */
+export function unwrapRecipe(json: unknown): { type: string; recipe: Record<string, unknown> } | null {
+  return unwrapRecipeType(json, 0)
+}
+
+function unwrapRecipeType(value: unknown, depth: number): { type: string; recipe: Record<string, unknown> } | null {
+  if (depth > 3 || !isRecord(value)) return null
+  for (const key of ['recipe', 'recipes'] as const) {
+    if (!(key in value)) continue
+    const raw = value[key]
+    const first = Array.isArray(raw) ? raw[0] : raw
+    if (!isRecord(first)) return null
+    if (typeof first['type'] === 'string' && isId(first['type'])) {
+      return { type: first['type'], recipe: first }
+    }
+    return unwrapRecipeType(first, depth + 1)
+  }
+  return null
+}
+
 /** 单个配方对象（含条件包装剥开后的内层）的完整分类流程 */
 function classifyRecipeObject(json: Record<string, unknown>, ctx: Ctx, depth: number): void {
   const consumed = new Set<string>()

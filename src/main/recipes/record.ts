@@ -4,7 +4,7 @@
  * 这里**不 import logger/paths/electron**，保证 worker 可以安全加载。
  */
 import type { RecipeRecord, RecipeSource } from '../../shared/types'
-import { extractRecipeIo } from './heuristics'
+import { extractRecipeIo, unwrapRecipe } from './heuristics'
 import { noteShapeSample } from './shapeSampler'
 
 /** 游戏加载顺序权重：模组 jar → 数据包（datapacks/、openloader）→ kubejs/data → 脚本（规格 3.6.5 ②） */
@@ -63,14 +63,18 @@ export function buildRecord(opts: RecordInput): RecipeRecord {
     const json = JSON.parse(opts.text.replace(/^\uFEFF/, '')) as unknown
     // 必须先取 JSON 自带的 type 再解析：把空 type 传给启发式会让所有配方都判成 partial（实测过一次）
     const jsonType = typeOf(json)
+    // B120/D-03：条件包装（forge:conditional 等 recipe/recipes 包装形态）按**内层配方 type** 归类——
+    // 顶层 type 只是包装器，1,536 条本体样本必须记到真实类型名下。外层 conditions 原样留在 raw：
+    // denormalize 从 raw 克隆打补丁，写回时 conditions 天然保留（TYPE_CHANGED 闸兜住顶层误写）。
+    // 形状采样喂内层对象——包装层没有 pattern/key，喂外层等于这些类型永远采不到形状。
+    const unwrapped = unwrapRecipe(json)
     const type = opts.type || (jsonType === 'unknown' ? '' : jsonType)
-    // 第 116 批 B1：只把**已解析对象**的引用交给采样器（O(1)，不拷贝、不二次读 jar）。
-    // 形状在扫描结束后统一聚合；这里不碰解析结果、不碰索引结构。
-    noteShapeSample(type, json)
-    const parsed = extractRecipeIo(type, json)
+    const effectiveType = unwrapped?.type ?? type
+    noteShapeSample(effectiveType, unwrapped?.recipe ?? json)
+    const parsed = extractRecipeIo(effectiveType, json)
     return {
       ...base,
-      type: type || 'unknown',
+      type: effectiveType || 'unknown',
       outputs: parsed.outputs,
       inputs: parsed.inputs,
       partial: parsed.partial,
