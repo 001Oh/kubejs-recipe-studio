@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * P3-23b：useSlotBinding 的 shiftHeld 全局监听改为引用计数生命周期——
  * 首个使用该 hook 的组件挂载时安装、最后一个卸载时移除；模块导入不再永久安装。

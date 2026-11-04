@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * UI-U2（T-08b）：键盘焦点**不得**切换详情。
  *

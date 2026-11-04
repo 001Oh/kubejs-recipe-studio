@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * T-27：CachePanel 交互用例（jsdom + RTL）。
  *

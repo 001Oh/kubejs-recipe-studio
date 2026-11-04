@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * P3-22c：启动失败兜底界面。
  * 修复前：main.tsx 的 void init() 无 catch——init 拒绝 = unhandled rejection + 白屏。

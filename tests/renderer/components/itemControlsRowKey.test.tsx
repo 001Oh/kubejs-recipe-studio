@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * P3-23a：MultiSlotControl 行 key 由 index 改为稳定键（值身份 + 出现序）。
  *

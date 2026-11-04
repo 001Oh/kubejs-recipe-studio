@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * T-26 / UI-U3：悬停预览 hook 的行为用例（jsdom + fake timers）。
  *

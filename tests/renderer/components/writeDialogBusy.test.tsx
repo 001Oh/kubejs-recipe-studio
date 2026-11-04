@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * P3-22b：WriteDialog 的 submit / saveElsewhere 桥异常兜底。
  * 修复前：callRaw 抛错（桥断开等）→ busy 永远卡在「写入中…」+ unhandled rejection；

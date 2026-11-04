@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * T-10 / G-12：组件级测试的本体（jsdom + @testing-library/react）。
  *
