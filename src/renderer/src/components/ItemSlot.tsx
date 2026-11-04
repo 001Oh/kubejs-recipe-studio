@@ -8,6 +8,8 @@ import type { JSX, ReactNode } from 'react'
 import type { SlotValue } from '@shared/types'
 import { ItemIcon } from './ItemIcon'
 import { countBadge, formatChance, registryAbbr, slotTitle } from '../store/slotUtils'
+import { useBenchUiStore } from '../views/bench/benchUiStore'
+import { useAppStore } from '../store/appStore'
 import { useHoverPreview } from '../views/sidebar/useHoverPreview'
 import { useIconKeys } from '../hooks/useIconKeys'
 
@@ -37,6 +39,8 @@ interface Props {
   onOpenPicker?: () => void
   onSetCount?: () => void
   onBrowseRecipes?: (id: string) => void
+  /** 第 116 批：中键粘贴（仅物品，数量 1）。流体/注册表槽与只读槽为 undefined */
+  onPasteItem?: (item: { id: string }) => void
   badge?: ReactNode
 }
 
@@ -58,6 +62,7 @@ export function ItemSlot(props: Props): JSX.Element {
     onOpenPicker,
     onSetCount,
     onBrowseRecipes,
+    onPasteItem,
     badge
   } = props
 
@@ -103,7 +108,7 @@ export function ItemSlot(props: Props): JSX.Element {
         }}
         className={cls.join(' ')}
         style={{ width: size, height: size, cursor: readOnly ? 'not-allowed' : value ? 'grab' : 'default' }}
-        title={value ? slotTitle(value, nameZh) : '空槽位\n双击选择物品 · 右键菜单 · 滚轮改数量'}
+        title={value ? slotTitle(value, nameZh) : '空槽位\n双击选择物品 · 中键粘贴（先在侧栏物品上中键复制）· 右键清空 · 滚轮改数量'}
         data-slot={slotKey}
         {...hover}
         onMouseDown={(e) => {
@@ -114,6 +119,18 @@ export function ItemSlot(props: Props): JSX.Element {
           if (e.button === 1) {
             e.preventDefault()
             e.stopPropagation()
+            // 第 116 批：中键粘贴——把侧栏中键复制的物品放进槽位（仅物品，数量 1）
+            if (readOnly) return
+            const clip = useBenchUiStore.getState().slotClipboard
+            if (!clip) {
+              useAppStore.getState().toast('剪贴板为空：先在侧栏物品上按中键复制', 'info')
+              return
+            }
+            if (kindHint === 'fluid' || kindHint === 'registry' || kindHint === 'activator') {
+              useAppStore.getState().toast('该槽位不接受物品粘贴', 'warn')
+              return
+            }
+            onPasteItem?.({ id: clip.id })
           }
         }}
         onClick={() => {
@@ -125,6 +142,13 @@ export function ItemSlot(props: Props): JSX.Element {
         onContextMenu={(e) => {
           if (readOnly) return
           e.preventDefault()
+          // 第 116 批：吸取态下右键 = 取消吸取（全局监听接管），不清空槽位
+          if (useAppStore.getState().eyedropper) return
+          // 右键取消：清空槽位（残留物品的快捷出路）；Shift+右键保留完整菜单
+          if (!e.shiftKey && onClear) {
+            onClear()
+            return
+          }
           setMenu({ x: e.clientX, y: e.clientY })
         }}
         onWheel={(e) => {

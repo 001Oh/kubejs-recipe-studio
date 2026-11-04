@@ -14,6 +14,7 @@ import { appendUnique, nextPageOffset, shouldPrefetch } from './sidebar/paging'
 import { useHoverPreview } from './sidebar/useHoverPreview'
 import { call } from '../api'
 import { useAppStore } from '../store/appStore'
+import { useBenchUiStore } from './bench/benchUiStore'
 import { ItemIcon } from '../components/ItemIcon'
 import { Highlight } from '../components/Highlight'
 import { EmptyState } from '../components/EmptyState'
@@ -418,20 +419,18 @@ function SideRow({
       }}
       {...drag.attributes}
       {...drag.listeners}
-      // 第 3 条 roving tabindex：整列只有一个 Tab 停靠点，其余行 -1，靠 ↑↓ 移动
-      tabIndex={rovingIndex === focusIndex ? 0 : -1}
-      data-row-index={rovingIndex}
-      role="listitem"
-      aria-pressed={selected}
-      {...hover}
       onMouseDown={(e) => {
-        // 中键吸取：Windows 会触发自动滚动，必须在 mousedown 上吃掉默认行为
+        // 第 116 批：中键 = 复制物品到槽位剪贴板（原为「中键吸取」，吸取入口改为 Alt+拖放）。
+        // Windows 中键会触发自动滚动，必须在 mousedown 上吃掉默认行为。
         if (e.button === 1) {
           e.preventDefault()
-          useAppStore.getState().pickEyedropper(hit.item)
+          e.stopPropagation()
+          useBenchUiStore.getState().setSlotClipboard({ id: hit.item.id })
+          useAppStore.getState().toast(`已复制 ${hit.item.nameZh || hit.item.id}，中键点槽位粘贴`, 'success')
         }
       }}
       onAuxClick={(e) => e.preventDefault()}
+      {...hover}
       onClick={(e) => pick(e.altKey)}
       onKeyDown={(e) => {
         // 第 3 条：行内子元素（如星标按钮）的按键不应被行级处理接管，

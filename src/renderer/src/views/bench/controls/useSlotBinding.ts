@@ -7,7 +7,7 @@ import type { FieldKind, SlotValue } from '@shared/types'
 import { useAppStore } from '../../../store/appStore'
 import { useBenchStore } from '../../../store/benchStore'
 import { useBenchUiStore } from '../benchUiStore'
-import { bumpCountAt, clearAt } from '../commitOps'
+import { bumpCountAt, clearAt, writeAt } from '../commitOps'
 import { placeEyedropper } from '../useBenchInteractions'
 
 /** ItemSlot 的 onClick 不带事件对象，用捕获阶段记下发车瞬间的修饰键 */
@@ -81,6 +81,8 @@ export interface SlotBinding {
   onRemove?: () => void
   onSetCount: () => void
   onBrowseRecipes: (id: string) => void
+  /** 第 116 批：中键粘贴（仅物品，数量 1）。只读/流体/注册表槽为 undefined（ItemSlot 侧拒绝） */
+  onPasteItem?: (item: { id: string }) => void
 }
 
 export function useSlotBinding(opts: SlotBindingOptions): SlotBinding {
@@ -131,6 +133,10 @@ export function useSlotBinding(opts: SlotBindingOptions): SlotBinding {
     onBrowseRecipes: (id: string) => {
       selectItem(id, 'craft')
       useAppStore.getState().setView('browse')
-    }
+    },
+    onPasteItem:
+      opts.readOnly || opts.kind === 'fluid' || opts.kind === 'registry'
+        ? undefined
+        : (item) => writeAt(opts.slotId, { kind: 'item', id: item.id, count: 1 })
   }
 }

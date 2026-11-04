@@ -58,8 +58,17 @@ export function DndLayer({ children }: { children: ReactNode }): JSX.Element {
     if (!eyedropper) return
     const move = (e: MouseEvent): void => setCursor({ x: e.clientX, y: e.clientY })
     window.addEventListener('pointermove', move)
-    return () => window.removeEventListener('pointermove', move)
-  }, [eyedropper])
+    // 第 116 批：吸取态右键 = 取消（替代 Esc 成为主路径；Esc 仍保留键盘可达）
+    const cancel = (e: MouseEvent): void => {
+      e.preventDefault()
+      clearEyedropper()
+    }
+    window.addEventListener('contextmenu', cancel)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('contextmenu', cancel)
+    }
+  }, [eyedropper, clearEyedropper])
 
   const onDragStart = (e: DragStartEvent): void => {
     const data = e.active.data.current as { value?: SlotValue; origin?: 'item' | 'slot'; from?: string } | undefined
@@ -105,7 +114,7 @@ export function DndLayer({ children }: { children: ReactNode }): JSX.Element {
         <div className="absorb-bar">
           <ItemIcon item={toIconSource(eyedropper)} size={32} />
           <span>{eyedropper.nameZh}</span>
-          <span className="aux">点击放置 · Shift 连续 · Esc 取消</span>
+          <span className="aux">点击放置 · Shift 连续 · 右键取消</span>
           <button className={`chip${eyedropperKeep ? ' on' : ''}`} onClick={() => setEyedropperKeep(!eyedropperKeep)}>
             连续放置 {eyedropperKeep ? '开' : '关'}
           </button>

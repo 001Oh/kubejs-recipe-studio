@@ -96,6 +96,9 @@ interface BenchUiStore {
   setWriteOpen: (open: boolean) => void
   setAdvancedOpen: (open: boolean) => void
   setJsonOpen: (open: boolean) => void
+  /** 第 116 批：槽位剪贴板（中键复制/粘贴）。只存物品 id，数量恒为 1（负责人裁定：粘贴仅物品） */
+  slotClipboard: { id: string } | null
+  setSlotClipboard: (item: { id: string } | null) => void
 }
 
 export const useBenchUiStore = create<BenchUiStore>((set, get) => ({
@@ -110,6 +113,7 @@ export const useBenchUiStore = create<BenchUiStore>((set, get) => ({
 
   narrow: false,
   zoom: 1,
+  slotClipboard: null,
   picker: null,
   registryPanel: null,
   countEditor: null,
@@ -283,5 +287,8 @@ export const useBenchUiStore = create<BenchUiStore>((set, get) => ({
   },
   setJsonOpen(open) {
     set({ jsonOpen: open })
+  },
+  setSlotClipboard(item) {
+    set({ slotClipboard: item })
   }
 }))
