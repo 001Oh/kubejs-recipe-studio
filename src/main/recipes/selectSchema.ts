@@ -1,9 +1,13 @@
 /**
  * P-C1：为「打开配方」选择合适的 schema（纯逻辑，无 IO）。
  *
- * 优先级：注册表（钉住/插件/L0/L1，由 registry 自身合并）→ 试点内置 → 通用兜底。
- * 本阶段只内置 `minecraft:crafting_shaped` 一个试点 schema；其余类型给 generic，
- * 让上层能明确区分「有结构化支持」与「只能看原文」。
+ * 实际顺序：试点内置 → 注册表（钉住/插件，由 registry 自身合并）→ 通用兜底。
+ * 试点类型优先于 pinned 是**设计选择，不是缺陷**（P3-13）：试点编辑器的字段模型
+ * 由内置 schema 固定（槽位/网格/输出键），若让 pin 的自定义 schema 覆盖，同一配方
+ * 会在 openRecipe / preview / commit 三条链上出现两套互不兼容的字段模型。
+ * 本阶段只内置 `minecraft:crafting_shaped` / `crafting_shapeless` / `create:mixing`
+ * 三个试点 schema；其余类型按注册表优先级取，最后落到 generic（只能看原文）。
+ * 参考 AUDIT-REMEDIATION-01.md §四。
  */
 import type { RecipeTypeSchema } from '../../shared/types'
 import type { NormalizedSchema, NormalizedSchemaSlot } from '../../shared/schemaModel'

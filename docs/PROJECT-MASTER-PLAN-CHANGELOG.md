@@ -411,3 +411,33 @@ T-02 仍待验收、D-29 仍 HOLD、P2 仍封闭、真实环境验证仍 0/15。
 **性质**：纯文书（A1）；Z.1–Z.8 历史快照未回改（与备份 `diff` 0 行）；V9 台账只读；src / tests / 产物零改动。
 
 **基准**：0.1.10 / `f94900cecaeaa54650e5d28dce3f5d3bc6840fd445c878aeb2dd51b382df3816`
+
+---
+
+## C-66 · 0.1.12（第 114 批）：审计修复第二批（健壮性 + 卫生项）
+
+**修复 7 组**：
+
+| 编号 | 内容 |
+|---|---|
+| **P3-6** | jarPool 业务回调（onResult / onFailed）统一 try/catch 兜底，抛错转日志不冒泡 |
+| **P3-5** | worker 生命周期：补 exit 监听 + 单任务超时（默认 10 分钟），池 Promise 不再永久挂起 |
+| **P3-21** | ensureSchema 迟到返回按请求 typeId 丢弃；loadSummaries 失败可区分（summariesError） |
+| **P3-22** | 提交路径异常兜底三处：CONFLICT 后 open 失败置显式冲突态 + 重试出路；WriteDialog submit/saveElsewhere 补 catch 复位 busy；启动 init 失败渲染错误界面（含日志目录） |
+| **P3-23** | 行 key 稳定化（值身份 + 出现序）；shiftHeld 监听改引用计数生命周期；commitOps.same() 改结构比较；setModifier 纳入 dirtyFields |
+| **P3-15** | create 分支补齐 OpenedRecipe 的 schemaSource / status / raw / notes，删除 `as unknown as` |
+| **P3-17** | modpack:clear 去 `as never`（恢复键写 undefined）；emitTarget 白名单消毒，非法值回退 event.custom |
+
+**文档**：README 新增「安全边界」节（沙箱超时只覆盖同步、插件信任边界、0.2.0 worker 隔离）；selectSchema / channel 注释写明「试点类型优先于 pinned 是设计选择」（P3-13）。
+
+**本批不做（所有者裁定）**：
+
+- P3-12 沙箱微任务超时：不修，登记为已知限制；worker 真隔离列 0.2.0。
+- P3-13 试点类型优先于 pinned：维持现状（产品语义），只改注释。
+- 死代码删除（P3-1/2/3/11/20）：不删，维持 README 三态表的「预留未接线」标注。
+- P3-7 channel 自动档顺序：0.1.11 已处置（只改注释），本批不碰。
+- P3-23 的撤销防抖 / extras 可撤销：会改变用户可感知行为，下一批先给方案。
+
+**门禁**：typecheck 0 / lint 0 / 922 passed（4 skipped + 3 todo，收集 929）/ build 0 / NSIS 0。
+
+**基准**：0.1.12；安装包与 SHA-256 见 `AUDIT-REMEDIATION-02.md`。

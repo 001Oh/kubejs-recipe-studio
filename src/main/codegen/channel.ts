@@ -6,6 +6,11 @@
  * 1. 附属未装绝不生成 `event.recipes.*`（禁止事项 14）；
  * 2. 用户填了任何 `sugarSupported:false` 的字段 → 自动降级，**绝不为了语法糖丢参数**；
  * 3. 偏好「始终语法糖」且条件不满足时明确报错，不静默降级（规格 3.6.11 生成偏好表）。
+ *
+ * 补充（P3-13，设计选择而非缺陷）：schema 选择侧对试点三类型固定使用内置 schema，
+ * 优先于 pinned/plugin 的自定义 schema——试点编辑器的字段模型与自定义槽位不兼容，
+ * 混用会让同一配方在 open / preview / commit 三条链上出现两套结构。
+ * 参考 AUDIT-REMEDIATION-01.md §四。
  */
 import type {
   BenchValues,
