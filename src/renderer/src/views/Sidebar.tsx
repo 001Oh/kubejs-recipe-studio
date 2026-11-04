@@ -420,13 +420,15 @@ function SideRow({
       {...drag.attributes}
       {...drag.listeners}
       onMouseDown={(e) => {
-        // 第 116 批：中键 = 复制物品到槽位剪贴板（原为「中键吸取」，吸取入口改为 Alt+拖放）。
+        // 第 116 批：中键 = 吸取 + 复制二合一——吸取模式照常激活（点击放置 / Shift 连续 / 右键取消），
+        // 同时物品进槽位剪贴板，任意槽位中键即可粘贴（仅物品，数量 1）。
         // Windows 中键会触发自动滚动，必须在 mousedown 上吃掉默认行为。
         if (e.button === 1) {
           e.preventDefault()
           e.stopPropagation()
+          useAppStore.getState().pickEyedropper(hit.item)
           useBenchUiStore.getState().setSlotClipboard({ id: hit.item.id })
-          useAppStore.getState().toast(`已复制 ${hit.item.nameZh || hit.item.id}，中键点槽位粘贴`, 'success')
+          useAppStore.getState().toast(`已复制 ${hit.item.nameZh || hit.item.id}，中键点槽位粘贴；或直接点击放置`, 'success')
         }
       }}
       onAuxClick={(e) => e.preventDefault()}
