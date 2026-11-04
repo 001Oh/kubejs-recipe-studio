@@ -10,12 +10,13 @@
 import { useMemo } from 'react'
 import type { JSX } from 'react'
 import { useBenchStore } from '../../store/benchStore'
-import { submitDraft } from '../../store/commitBridge'
+import { retryConflictRefresh, submitDraft } from '../../store/commitBridge'
 import { Icon } from '../../components/Icon'
 
 export function PilotDraftPanel(): JSX.Element | null {
   const draft = useBenchStore((s) => s.draft)
   const conflict = useBenchStore((s) => s.draftConflict)
+  const conflictLoadFailed = useBenchStore((s) => s.conflictLoadFailed)
   const bench = useBenchStore((s) => s.bench)
   const committing = useBenchStore((s) => s.committing)
   const lastCommit = useBenchStore((s) => s.lastCommit)
@@ -30,7 +31,6 @@ export function PilotDraftPanel(): JSX.Element | null {
   const copyMode = draft.meta.base === null
   const dirty = draft.meta.dirtyFields.length
   const canSubmit = !committing && !conflict && !draft.unsafeReason && draft.meta.dirtyFields.length > 0
-
   const submitHint = conflict
     ? '先处理冲突才能提交'
     : draft.unsafeReason
@@ -86,6 +86,34 @@ export function PilotDraftPanel(): JSX.Element | null {
         </div>
       ))}
 
+      {!conflict && conflictLoadFailed ? (
+        // P3-22a：提交撞 CONFLICT 后读取最新原始失败——显式冲突态 + 可操作出路，提交按钮保持可用
+        <div className="conflict-card" role="alert">
+          <header className="conflict-head">
+            <span className="conflict-icon" aria-hidden="true">
+              <Icon name="alert" size={18} />
+            </span>
+            <div>
+              <strong>原始配方已变化，且无法读取最新内容</strong>
+              <p>
+                提交被基线校验拒绝，但重新读取原始数据也失败了。可以直接重试读取；也可以取消草稿后在浏览页重新打开配方。
+              </p>
+            </div>
+          </header>
+          <ul className="conflict-options">
+            <li>
+              <div className="conflict-opt">
+                <strong>重试读取</strong>
+                <p>再读一次磁盘上的最新原始数据；读取成功后进入正常的冲突三选一。</p>
+              </div>
+              <button className="btn btn-sm" onClick={() => void retryConflictRefresh()}>
+                重试读取
+              </button>
+            </li>
+          </ul>
+        </div>
+      ) : null}
+
       {conflict ? (
         <div className="conflict-card" role="alert">
           <header className="conflict-head">
@@ -98,8 +126,7 @@ export function PilotDraftPanel(): JSX.Element | null {
                 磁盘上的文件在你打开草稿之后被改过（rawHash 不一致）。为避免覆盖别人的修改，提交已暂停。请选择一种处理方式：
               </p>
             </div>
-          </header>
-          <ul className="conflict-options">
+          </header>          <ul className="conflict-options">
             <li>
               <div className="conflict-opt">
                 <strong>重新载入最新内容</strong>

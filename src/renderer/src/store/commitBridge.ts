@@ -67,6 +67,7 @@ function applyCommitted(result: CommitRecipeResult): void {
       ]
     },
     draftConflict: null,
+    conflictLoadFailed: false,
     loadedFrom: result.savedUid,
     lastCommit: { path: result.savedPath, uid: result.savedUid, at: Date.now() }
   })
@@ -75,14 +76,26 @@ function applyCommitted(result: CommitRecipeResult): void {
 async function refreshConflict(uid: string): Promise<void> {
   const opened = await call('recipes:open', { uid })
   if (!opened || !opened.normalized) {
-    useAppStore.getState().toast('原始配方已变化，且无法读取最新内容；请重新打开配方', 'error')
+    // P3-22a：只 toast 会把用户留在「无冲突态却提交被拒」的循环里——必须置显式冲突态，
+    // 由面板给出「重试读取 / 取消草稿重新打开」的出路；提交按钮保持可用（不禁用）。
+    useBenchStore.setState({ conflictLoadFailed: true })
+    useAppStore.getState().toast('原始配方已变化，且无法读取最新内容；可点「重试读取」，或取消草稿后重新打开配方', 'error')
+    useAppStore.getState().pushLog('ERROR', 'RECIPE', `冲突后读取最新原始失败：${uid}`)
     return
   }
+  useBenchStore.setState({ conflictLoadFailed: false })
   // 只挂起冲突，绝不在这里替换用户草稿（默认不覆盖）
   useBenchStore.setState({ draftConflict: opened })
   useAppStore
     .getState()
     .toast('原始配方已变化：请在面板里选择「重新载入 / 保留我的修改 / 另存副本」', 'warn')
+}
+
+/** P3-22a：冲突横幅的「重试读取」——成功置冲突态，失败保持横幅（可继续重试）。 */
+export async function retryConflictRefresh(): Promise<void> {
+  const draft = useBenchStore.getState().draft
+  if (!draft) return
+  await refreshConflict(draft.normalized.source.uid)
 }
 
 /** 提交当前试点草稿；成功后才清 dirtyFields，失败保持草稿可重试 */

@@ -38,6 +38,8 @@ export interface BenchStore {
   draft: PilotDraft | null
   /** 原始数据变化且未处理时，挂起的新版本（默认不覆盖用户编辑） */
   draftConflict: OpenedRecipe | null
+  /** P3-22a：提交撞 CONFLICT 后读取最新原始失败——置冲突处理横幅（重试读取/取消草稿），提交按钮不禁用 */
+  conflictLoadFailed: boolean
   /** 提交进行中（防重复点击） */
   committing: boolean
   /** 最近一次成功保存（路径与时间，用于面板展示） */
@@ -169,6 +171,7 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
   loadedFrom: null,
   draft: null,
   draftConflict: null,
+  conflictLoadFailed: false,
   committing: false,
   lastCommit: null,
 
@@ -349,6 +352,7 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
         banners: loaded.banners
       },
       draftConflict: null,
+      conflictLoadFailed: false,
       lastCommit: null,
       loadedFrom: opened.record.uid
     })
@@ -374,6 +378,7 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
         banners: loaded.banners
       },
       draftConflict: null,
+      conflictLoadFailed: false,
       lastCommit: null,
       loadedFrom: pending.record.uid
     })
@@ -396,6 +401,7 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
     // 保留当前编辑值，但把基线换成新原始；未知字段以新原文为准
     set({
       draftConflict: null,
+      conflictLoadFailed: false,
       draft: {
         ...draft,
         normalized: loaded.normalized,
@@ -429,6 +435,7 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
     })()
     set({
       draftConflict: null,
+      conflictLoadFailed: false,
       draft: { ...draft, uid: `copy:${draft.uid}#${stamp}`, meta: { ...draft.meta, base: null } }
     })
     useAppStore.getState().toast('已另存为副本（脱离原始基线，不会覆盖原配方）', 'info')
