@@ -17,7 +17,7 @@ import { logger } from '../logger'
 
 /** 只暴露核心需要的三个方法，便于测试注入假实现 */
 export interface PoolWorker {
-  on(event: 'message' | 'error', listener: (payload: unknown) => void): unknown
+  on(event: 'message' | 'error' | 'exit', listener: (payload: unknown) => void): unknown
   postMessage(message: unknown): void
   terminate(): unknown
 }
@@ -37,6 +37,11 @@ export interface JarPoolOptions<T> {
   /** 无 worker 时的兜底实现，返回值语义与 worker payload 一致 */
   inline: (jarPath: string) => Promise<T>
   concurrency?: number
+  /**
+   * P3-5：单任务超时（毫秒）。worker 超时不响应即 terminate 并记该 jar 失败，
+   * 防止整池永久挂起；真实大 jar 扫描可达分钟级，默认 10 分钟。
+   */
+  taskTimeoutMs?: number
   /** 仅供测试注入假 worker */
   createWorker?: (script: string, data: unknown) => PoolWorker
 }
@@ -51,6 +56,8 @@ interface Lane {
   worker: PoolWorker
   current: string | null
   taskId: number
+  /** P3-5：当前任务的超时定时器（worker 不响应时的兜底） */
+  timer: ReturnType<typeof setTimeout> | null
 }
 
 interface WorkerMessage<T> {
@@ -61,6 +68,9 @@ interface WorkerMessage<T> {
 }
 
 export const POOL_CANCELED = '已取消：并发扫描'
+
+/** P3-5：单任务超时默认值——真实大 jar 扫描可达分钟级，10 分钟兜底足够宽 */
+const DEFAULT_TASK_TIMEOUT_MS = 600_000
 
 export function defaultPoolConcurrency(): number {
   return Math.max(1, Math.min(cpus().length, SCAN_WORKER_MAX_CONCURRENCY))
@@ -103,10 +113,20 @@ async function runWorkers<T>(opts: JarPoolOptions<T>, concurrency: number): Prom
     const create =
       opts.createWorker ?? ((script, data) => new Worker(script, { workerData: data }) as unknown as PoolWorker)
 
+    const disarmTimer = (lane: Lane): void => {
+      if (lane.timer !== null) {
+        clearTimeout(lane.timer)
+        lane.timer = null
+      }
+    }
+
     const finish = (err?: Error): void => {
       if (settled) return
       settled = true
-      for (const lane of lanes) void lane.worker.terminate()
+      for (const lane of lanes) {
+        disarmTimer(lane)
+        void lane.worker.terminate()
+      }
       if (err) reject(err)
       else resolve({ usedWorkers: true, completed, failed })
     }
@@ -122,18 +142,45 @@ async function runWorkers<T>(opts: JarPoolOptions<T>, concurrency: number): Prom
       lane.current = jarPath
       lane.taskId = id
       pending.set(id, { lane, jarPath })
+      // P3-5：单任务超时兜底——worker 不响应即 terminate 并按失败 settle，绝不整池挂死
+      const timeoutMs = Math.max(1, opts.taskTimeoutMs ?? DEFAULT_TASK_TIMEOUT_MS)
+      lane.timer = setTimeout(() => {
+        lane.timer = null
+        if (settled || !pending.has(id)) return
+        pending.delete(id)
+        failed += 1
+        lane.current = null
+        safeCall('失败回调', jarPath, () => opts.onFailed(jarPath, `单 jar 处理超时（>${timeoutMs}ms），worker 已终止`))
+        void lane.worker.terminate()
+        replaceLane(lane)
+        maybeDone()
+      }, timeoutMs)
       lane.worker.postMessage({ id, jarPath })
+    }
+
+    // P3-5：把失活车道换成新 worker 并继续派发（补位）
+    const replaceLane = (lane: Lane): void => {
+      disarmTimer(lane)
+      const idx = lanes.indexOf(lane)
+      if (idx >= 0) lanes.splice(idx, 1)
+      void lane.worker.terminate()
+      const replacement = spawn()
+      if (replacement) {
+        lanes.push(replacement)
+        dispatch(replacement)
+      }
     }
 
     const spawn = (): Lane | null => {
       if (opts.signal.aborted) return null
       const worker = create(opts.workerScript, opts.workerData)
-      const lane: Lane = { worker, current: null, taskId: 0 }
+      const lane: Lane = { worker, current: null, taskId: 0, timer: null }
       worker.on('message', (raw) => {
         const msg = raw as WorkerMessage<T>
         const task = pending.get(msg.id)
         lane.current = null
         lane.taskId = 0
+        disarmTimer(lane)
         if (!task || task.lane !== lane) return
         pending.delete(msg.id)
         if (msg.ok) {
@@ -148,6 +195,7 @@ async function runWorkers<T>(opts: JarPoolOptions<T>, concurrency: number): Prom
       })
       worker.on('error', (raw) => {
         const err = raw instanceof Error ? raw : new Error(String(raw))
+        disarmTimer(lane)
         const task = [...pending.values()].find((item) => item.lane === lane)
         if (task) {
           pending.delete(lane.taskId)
@@ -155,14 +203,27 @@ async function runWorkers<T>(opts: JarPoolOptions<T>, concurrency: number): Prom
           safeCall('失败回调', task.jarPath, () => opts.onFailed(task.jarPath, err.message))
         }
         lane.current = null
-        const idx = lanes.indexOf(lane)
-        if (idx >= 0) lanes.splice(idx, 1)
-        void worker.terminate()
-        const replacement = spawn()
-        if (replacement) {
-          lanes.push(replacement)
-          dispatch(replacement)
+        replaceLane(lane)
+        maybeDone()
+      })
+      // P3-5：worker 提前退出（任意码）——若它还有未交付的任务，按失败处理并补位；
+      // 车道已被超时/替换分支处理过（不在 lanes 里）则忽略，防重入
+      worker.on('exit', (raw) => {
+        if (settled || !lanes.includes(lane)) return
+        const code = typeof raw === 'number' ? raw : Number(raw)
+        disarmTimer(lane)
+        const task = [...pending.values()].find((item) => item.lane === lane)
+        const jarPath = task?.jarPath ?? lane.current
+        lane.current = null
+        lane.taskId = 0
+        if (task) {
+          pending.delete(lane.taskId)
+          failed += 1
+          safeCall('失败回调', jarPath ?? '', () =>
+            opts.onFailed(jarPath ?? '', `worker 异常退出（exit code=${code}），该 jar 按失败处理`)
+          )
         }
+        replaceLane(lane)
         maybeDone()
       })
       lanes.push(lane)

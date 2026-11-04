@@ -9,10 +9,11 @@ type Behavior = 'ok' | 'fail' | 'crash' | 'hang'
 
 class FakeWorker implements PoolWorker {
   terminated = false
-  private handlers: Record<'message' | 'error', ((payload: unknown) => void)[]> = { message: [], error: [] }
+  // P3-5 起核心会挂 exit 监听（真实 worker 线程结束/被终止都会触发），假件同步支持
+  private handlers: Record<'message' | 'error' | 'exit', ((payload: unknown) => void)[]> = { message: [], error: [], exit: [] }
   constructor(readonly index: number, private readonly pool: FakePool) {}
 
-  on(event: 'message' | 'error', listener: (payload: unknown) => void): void {
+  on(event: 'message' | 'error' | 'exit', listener: (payload: unknown) => void): void {
     this.handlers[event].push(listener)
   }
 
