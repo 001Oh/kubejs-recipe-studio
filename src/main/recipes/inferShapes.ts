@@ -159,5 +159,7 @@ export interface InferredShapesFile {
   /** 采样 + 聚合花了多久（ms），用于"扫描耗时不增加"的核对 */
   buildMs: number
   typeCount: number
+  /** B120/D-05：缓存签名（包路径|记录数|类型数|SCHEMA_LIB_VERSION），读取侧比对防旧缓存永生 */
+  signature: string
   types: Record<string, TypeShape>
 }

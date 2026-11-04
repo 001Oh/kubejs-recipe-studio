@@ -23,6 +23,7 @@ import { cacheFile } from './paths'
 import { loadFromCache as loadRecipeCache, stats as recipeStats } from './recipes/recipeIndex'
 import { createProgressThrottle } from './progressThrottle'
 import { scanRecipes, type EmitProgress } from './recipes/scanRecipes'
+import { buildInferredSchemas } from './schema/inferredSource'
 
 export const SCAN_TASK_ID = 'items-scan'
 
@@ -72,6 +73,8 @@ export interface ScanDeps {
   scanRecipes?: (emit: EmitProgress, options: { isAborted?: () => boolean; skipPersist?: boolean }) => Promise<RecipeStats>
   loadRecipeCache?: () => Promise<boolean>
   recipeStats?: () => RecipeStats | null
+  /** B120/D-05：扫描收敛点后的 L1 推断后台构建（测试可替换为 no-op） */
+  buildInferred?: (emit?: (label: string, current: number, total: number) => void) => Promise<boolean>
 }
 
 /**
@@ -161,6 +164,16 @@ export async function startScan(rebuild: boolean, deps: ScanDeps = {}): Promise<
 
     progress('索引已就绪', 1, 1, 'items')
     uiProgress.flush({ phase: 'items', current: 1, total: 1, label: '索引已就绪', elapsedMs: Date.now() - startedAt })
+
+    // ── B120/D-05：扫描收敛点（新扫与缓存命中都在这里汇合）→ 触发 L1 推断层后台构建。
+    // 不 await：首屏 schema:list 走 builtin/l0/plugin/pinned 快路径（≤300ms 指标），
+    // 推断层就绪后 putMany('inferred',…) + applyMerge 即时并入类型选择器；进度走 phase:'schema'。
+    const buildInferred = deps.buildInferred ?? buildInferredSchemas
+    void buildInferred((label, current, total) => progress(label, current, total, 'schema')).catch(
+      (err: unknown) => {
+        logger.warn('SCHEMA', 'L1 推断后台构建失败（不影响索引可用）', err instanceof Error ? err.message : String(err))
+      }
+    )
     const virtual = items.items.filter((item) => item.virtual).length
     logger.success(
       'INDEX',

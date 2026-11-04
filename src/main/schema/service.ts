@@ -35,6 +35,7 @@ import { getCurrentModpack } from '../modpack/state'
 import { allRecords, typeUniverse } from '../recipes/recipeIndex'
 import { getPluginLoadStatus } from '../plugins/loader'
 import { buildCoverageReport, type CapabilityFacts } from './capability'
+import { restoreInferredLayer } from './inferredSource'
 import { displayNameForField } from './naming'
 import { recipeTypeNameZh } from '@shared/recipeTypeNames'
 import {
@@ -157,6 +158,9 @@ export async function ensureSchemas(): Promise<void> {
       const pluginLayer = fetchLayer('plugin')
       replaceLayer('plugin', pluginLayer.ok ? pluginLayer.schemas : prevPluginLayer)
       await loadPinned()
+      // B120/D-05：clearSchemas 会把 inferred 层一并清空——签名仍匹配时从内存同步回填，
+      // 避免每次注册表重建都让选择器空窗到下一次扫描（后台构建只由扫描收敛点触发）
+      restoreInferredLayer()
       applyMerge(schemaFacts())
       // FIX-03：插件层没有成功装配时**不得**写「完整成功」的快照戳。
       // 戳只表达「生效表对应当前 facts（包路径/索引规模/附属数/模组数）」，并不包含插件加载状态；

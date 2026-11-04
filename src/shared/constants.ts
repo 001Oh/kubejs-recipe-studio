@@ -66,6 +66,13 @@ export const INFER_FIELD_MIN_RATE = 0.1
 export const INFER_LOW_CONFIDENCE_SAMPLES = 3
 export const INFER_MAX_DEPTH = 3
 
+/**
+ * B120/D-05：schema 库版本常量——进推断缓存（inferred-schemas / inferred-shapes）的签名。
+ * 归纳/命名规则一变就 +1，旧缓存立即失效，杜绝「schema 库升级后旧缓存永不失效」
+ * （116 批遗留.2：readInferredShapes 不比对签名）。
+ */
+export const SCHEMA_LIB_VERSION = 1
+
 /** 配对字段合并要求的共现率（规格 3.6.12） */
 export const PAIR_CO_OCCURRENCE_MIN = 0.95
 

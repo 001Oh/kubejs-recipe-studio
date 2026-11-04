@@ -74,7 +74,7 @@ export function modpackCacheDir(modpackPath: string): string {
 
 export function cacheFile(
   modpackPath: string,
-  name: 'items' | 'recipes' | 'meta' | 'probe' | 'schemas' | 'inferred-shapes'
+  name: 'items' | 'recipes' | 'meta' | 'probe' | 'schemas' | 'inferred-shapes' | 'inferred-schemas'
 ): string {
   return join(modpackCacheDir(modpackPath), `${name}.json`)
 }

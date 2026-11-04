@@ -103,6 +103,7 @@ export async function scanRecipes(emit: EmitProgress, options: ScanRecipesOption
   const shapes = inferShapes(collectAllSamples())
   const shapeBuildMs = Date.now() - shapeStarted
   if (!options.skipPersist) {
+    // B120/D-05：writeInferredShapes 内部带当前签名（采样来源 / SCHEMA_LIB_VERSION 变化即失效）
     const file = await writeInferredShapes(modpack.path, shapes, shapeBuildMs)
     const nonEmpty = Object.values(shapes).filter((s) => s.fields.length > 0).length
     logger.info(
