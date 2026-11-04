@@ -61,6 +61,8 @@ function asGrid(value: unknown): (SlotValue | null)[] {
 interface BenchUiStore {
   summaries: SchemaSummary[]
   summariesLoaded: boolean
+  /** P3-21：schema:list 的失败原因；null = 加载成功。失败与「确实没有类型」必须可区分 */
+  summariesError: string | null
   /** 当前配方类型的完整 schema；null = 拿不到（走三级降级） */
   schema: RecipeTypeSchema | null
   schemaTypeId: string
@@ -99,6 +101,7 @@ interface BenchUiStore {
 export const useBenchUiStore = create<BenchUiStore>((set, get) => ({
   summaries: [],
   summariesLoaded: false,
+  summariesError: null,
   schema: null,
   schemaTypeId: '',
   schemaLoading: false,
@@ -115,8 +118,15 @@ export const useBenchUiStore = create<BenchUiStore>((set, get) => ({
   jsonOpen: false,
 
   async loadSummaries() {
-    const list = await call('schema:list')
-    set({ summaries: list ?? [], summariesLoaded: true })
+    // P3-21：失败与「确实没有类型」可区分——错误进 summariesError，由 UI 呈现「读取失败，请重试」
+    try {
+      const list = await callOrThrow('schema:list')
+      set({ summaries: list ?? [], summariesLoaded: true, summariesError: null })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      set({ summaries: [], summariesLoaded: true, summariesError: message })
+      useAppStore.getState().pushLog('ERROR', 'SCHEMA', 'schema:list 加载失败', message)
+    }
   },
 
   async ensureSchema(typeId) {
@@ -135,9 +145,17 @@ export const useBenchUiStore = create<BenchUiStore>((set, get) => ({
     // 于是一次瞬时失败会让该类型在整场会话里都拿不到 schema，且不会重试。
     try {
       const schema = await callOrThrow('schema:get', { typeId })
-      set({ schema, schemaLoading: false, schemaCache: { ...get().schemaCache, [typeId]: schema } })
+      const schemaCache = { ...get().schemaCache, [typeId]: schema }
+      // P3-21：迟到返回不覆盖当前选择——用户可能已切到别的类型；schema/schemaTypeId/
+      // schemaLoading 属于「最新一次请求」。缓存照常更新（旧类型的 schema 对旧类型仍有效）。
+      if (get().schemaTypeId !== typeId) {
+        set({ schemaCache })
+        return schema
+      }
+      set({ schema, schemaTypeId: typeId, schemaLoading: false, schemaCache })
       return schema
     } catch (err) {
+      if (get().schemaTypeId !== typeId) return null
       set({ schema: null, schemaLoading: false })
       useAppStore.getState().toast(`配方类型 ${typeId} 的字段定义加载失败，可重试`, 'error')
       useAppStore.getState().pushLog('ERROR', 'SCHEMA', `schema:get 失败：${typeId}`, err instanceof Error ? err.message : String(err))
