@@ -74,6 +74,10 @@ export function App(): JSX.Element {
 
   return (
     <div className={`shell${railHidden ? ' shell--rail-hidden' : ''}${ui.logCollapsed ? ' shell--log-collapsed' : ''}`}>
+      {/* U-26：DndContext 必须包住整个 shell——拖拽源在左栏（Sidebar 的 useDraggable），
+          落点在中栏（ItemSlot 的 useDroppable）。此前 DndLayer 只包住中间内容区，
+          侧栏的拖拽监听拿到的是空上下文（dnd-kit 静默降级），拖拽从未启动。 */}
+      <DndLayer>
       {!railHidden ? (
         <>
           <div className="pane rail-pane" style={{ width: ui.sidebarWidth }}>
@@ -92,7 +96,6 @@ export function App(): JSX.Element {
       <div className="main">
         <TopBar />
         <BannerBar />
-        <DndLayer>
           <div className="work">
             <div className="pane pane-center">
               {settingsOpen ? <SettingsView /> : view === 'browse' ? <BrowseView /> : <BenchView />}
@@ -122,8 +125,8 @@ export function App(): JSX.Element {
               </>
             )}
           </div>
-        </DndLayer>
       </div>
+      </DndLayer>
 
       {ui.logCollapsed ? (
         <div className="logzone logzone-collapsed">
