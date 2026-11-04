@@ -62,6 +62,17 @@ describe('P0 IPC 接线完整性', () => {
     expect(res.error).toContain('未注册的 IPC channel')
   })
 
+  it('第 115 批续：source:reveal 三处注册齐全（类型映射 / 通道数组 / handler）', async () => {
+    vi.resetModules()
+    const { registerHandlers } = await import('@main/handlers')
+    const { registeredChannels } = await import('@main/ipcRegistry')
+    const { INVOKE_CHANNELS } = await import('@shared/ipc')
+    registerHandlers()
+    // 类型映射由 registerHandler<'source:reveal'> 的泛型在编译期保证；这里查运行期两处
+    expect([...INVOKE_CHANNELS]).toContain('source:reveal')
+    expect(registeredChannels()).toContain('source:reveal')
+  })
+
   it('P0 关注的九个通道全部可用（codegen / scripts / plugins / schema）', async () => {
     vi.resetModules()
     const { registerHandlers } = await import('@main/handlers')

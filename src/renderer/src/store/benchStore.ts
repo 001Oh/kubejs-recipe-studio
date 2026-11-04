@@ -40,6 +40,12 @@ export interface BenchStore {
   draftConflict: OpenedRecipe | null
   /** P3-22a：提交撞 CONFLICT 后读取最新原始失败——置冲突处理横幅（重试读取/取消草稿），提交按钮不禁用 */
   conflictLoadFailed: boolean
+  /**
+   * 第 115 批 D3：可行动的提交失败（RAW_UNREADABLE / SAVE_FAILED / TARGET_VANISHED …）。
+   * 只放"用户能做点什么"的失败；NO_CHANGES / BUSY 这类仍走 toast。
+   * 面板关闭只清这里，不动 draft。
+   */
+  commitFailure: { code: string; message: string; at: number } | null
   /** 提交进行中（防重复点击） */
   committing: boolean
   /** 最近一次成功保存（路径与时间，用于面板展示） */
@@ -66,6 +72,8 @@ export interface BenchStore {
   resolveConflictSaveCopy: () => void
   /** 取消编辑：丢弃草稿，原始数据不动 */
   cancelDraft: () => void
+  /** D3：登记一次可行动的提交失败（由 commitBridge 调用） */
+  setCommitFailure: (failure: { code: string; message: string } | null) => void
   /** 当前草稿的预览（未编辑时优先原文）；冲突未解决或非草稿时返回 null */
   getDraftPreview: () => DraftPreview | null
   reset: () => void
@@ -172,6 +180,7 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
   draft: null,
   draftConflict: null,
   conflictLoadFailed: false,
+  commitFailure: null,
   committing: false,
   lastCommit: null,
 
@@ -313,6 +322,7 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
       loadedFrom: record.uid,
       draft: null,
       draftConflict: null,
+      commitFailure: null,
       lastCommit: null
     })
     useAppStore.getState().pushLog(
@@ -355,6 +365,7 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
       },
       draftConflict: null,
       conflictLoadFailed: false,
+      commitFailure: null,
       lastCommit: null,
       loadedFrom: opened.record.uid
     })
@@ -381,6 +392,7 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
       },
       draftConflict: null,
       conflictLoadFailed: false,
+      commitFailure: null,
       lastCommit: null,
       loadedFrom: pending.record.uid
     })
@@ -404,6 +416,7 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
     set({
       draftConflict: null,
       conflictLoadFailed: false,
+      commitFailure: null,
       draft: {
         ...draft,
         normalized: loaded.normalized,
@@ -438,9 +451,14 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
     set({
       draftConflict: null,
       conflictLoadFailed: false,
+      commitFailure: null,
       draft: { ...draft, uid: `copy:${draft.uid}#${stamp}`, meta: { ...draft.meta, base: null } }
     })
     useAppStore.getState().toast('已另存为副本（脱离原始基线，不会覆盖原配方）', 'info')
+  },
+
+  setCommitFailure(failure) {
+    set({ commitFailure: failure ? { ...failure, at: Date.now() } : null })
   },
 
   cancelDraft() {
@@ -448,7 +466,7 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
     get().snapshot()
     // P2-3：取消草稿同样是会话边界——不清栈的话 undo 会复活已取消草稿的 bench 值
     //（draft 已为 null，走 WriteDialog 通用路径时试点键值会被当普通字段导出）。
-    set({ past: [], future: [], bench: emptyBench(), draft: null, draftConflict: null, loadedFrom: null, lastCommit: null })
+    set({ past: [], future: [], bench: emptyBench(), draft: null, draftConflict: null, commitFailure: null, loadedFrom: null, lastCommit: null })
     if (had) useAppStore.getState().pushLog('INFO', 'RECIPE', `已取消草稿 ${had.uid}（原始数据未改动）`)
   },
 
@@ -468,7 +486,7 @@ export const useBenchStore = create<BenchStore>((set, get) => ({
 
   reset() {
     get().snapshot()
-    set({ bench: emptyBench(), loadedFrom: null, draft: null, draftConflict: null, lastCommit: null })
+    set({ bench: emptyBench(), loadedFrom: null, draft: null, draftConflict: null, commitFailure: null, lastCommit: null })
   },
 
   undo() {

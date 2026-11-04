@@ -10,6 +10,7 @@ import { call, callOrThrow, callRaw } from '../api'
 import { useAppStore } from '../store/appStore'
 import { Icon } from '../components/Icon'
 import { CachePanel } from '../components/CachePanel'
+import { EDIT_ENTRIES, MODE_NOTES } from './bench/editModes'
 import { THEMES, THEME_LIST } from '@shared/theme'
 import './views.css'
 
@@ -211,9 +212,22 @@ export function SettingsView(): JSX.Element {
               )
             })}
           </div>
-          <p className="settings-hint">
-            开启后这些类型走「原始为权威」的结构化编辑：可追踪脏字段、保留未建模字段、提交前校验源文件哈希并在冲突时要求显式选择。
-          </p>
+          <div className="settings-hint settings-modes">
+            {/* D1：这段文案与工作台空态面板、徽标 hover 共用同一份定义（views/bench/editModes.ts） */}
+            <p>{MODE_NOTES.structured}</p>
+            <p>{MODE_NOTES.generic}</p>
+            <ul className="settings-mode-list">
+              {EDIT_ENTRIES.map((entry) => (
+                <li key={entry.id} data-entry={entry.id}>
+                  <span className="settings-mode-ordinal" aria-hidden="true">
+                    {entry.ordinal}
+                  </span>
+                  <strong>{entry.title}</strong>
+                  <span className="settings-mode-when">{entry.when}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
 
         <section className="set-card">

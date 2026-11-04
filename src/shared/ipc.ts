@@ -269,6 +269,15 @@ export interface InvokeMap {
   'codegen:write': { req: WriteRequest; res: WriteResult }
   'scripts:list': { req: undefined; res: ScriptEntry[] }
   'scripts:rename': { req: { name: string; to: string }; res: ScriptEntry[] }
+  /**
+   * 第 115 批续：在资源管理器中定位源文件。
+   * **只接受配方 uid**——路径由主进程从 `file:` uid 解析并做 `inside(modpackRoot)` 校验，
+   * 渲染层永远传不进绝对路径（详见 handlers/sourceHandlers.ts 的三条拒绝路径）。
+   */
+  'source:reveal': {
+    req: { uid: string }
+    res: { revealed: boolean; path: string; relativePath: string }
+  }
   'logs:export': { req: { entries: LogEntry[] }; res: { path: string } }
 }
 
@@ -328,6 +337,7 @@ export const INVOKE_CHANNELS = [
   'codegen:write',
   'scripts:list',
   'scripts:rename',
+  'source:reveal',
   'logs:export'
 ] as const satisfies readonly InvokeName[]
 

@@ -10,11 +10,14 @@ import { callOrThrow } from '../api'
 import { useAppStore } from '../store/appStore'
 import { INPUTS_KEY, OUTPUTS_KEY, useBenchStore } from '../store/benchStore'
 import { PilotDraftPanel } from './bench/PilotDraftPanel'
-import { createBlankDraft } from '../store/draftBridge'
+import { createBlankDraft, isBlankDraft } from '../store/draftBridge'
 import { PilotGridEditor } from './bench/PilotGridEditor'
 import { PilotListEditor } from './bench/PilotListEditor'
 import { WriteDialog } from './bench/panels/WriteDialog'
 import { useBenchInteractions } from './bench/useBenchInteractions'
+import { useBenchUiStore } from './bench/benchUiStore'
+import { StartHerePanel } from './bench/StartHerePanel'
+import { MODE_NOTES, resolveEntryStates, writeTargetOf, type EditEntryId } from './bench/editModes'
 import { Icon } from '../components/Icon'
 import './views.css'
 
@@ -72,6 +75,7 @@ export function BenchView(): JSX.Element {
   }
   const future = useBenchStore((s) => s.future.length)
   const pilotShaped = pilotDraft?.schema.layoutKind === 'shaped'
+  const modpack = useAppStore((s) => s.modpack)
   const eyedropper = useAppStore((s) => s.eyedropper)
   const clearEyedropper = useAppStore((s) => s.clearEyedropper)
   const toast = useAppStore((s) => s.toast)
@@ -106,6 +110,36 @@ export function BenchView(): JSX.Element {
   const pilotType = pilotTypes.includes(bench.typeId)
   const isGeneric = bench.typeId === GENERIC || (summaries.length > 0 && summaries.every((s) => s.id !== bench.typeId))
 
+  // D1/D2：入口可用性与「这次提交会写到哪里」都从当前状态派生；文案唯一来源见 bench/editModes.ts
+  const entryStates = useMemo(() => resolveEntryStates({ hasModpack: !!modpack, pilotType }), [modpack, pilotType])
+  const writeTarget = useMemo(
+    () =>
+      writeTargetOf({
+        hasDraft: !!pilotDraft,
+        copyMode: pilotDraft ? pilotDraft.meta.base === null : false,
+        blank: isBlankDraft(pilotDraft),
+        sourcePath: pilotDraft?.normalized.source.sourcePath ?? ''
+      }),
+    [pilotDraft]
+  )
+
+  const onPickEntry = (id: EditEntryId): void => {
+    if (id === 'open') {
+      useAppStore.getState().setView('browse')
+      return
+    }
+    if (id === 'create') {
+      void startBlankDraft()
+      return
+    }
+    // ③ 快速导出：直接给出可填的字段，不让人先猜"在哪里填"
+    if (inputs.length === 0) useBenchStore.getState().setValue(INPUTS_KEY, [{ kind: 'item', id: '', count: 1 }])
+    window.requestAnimationFrame(() => {
+      const first = document.querySelector<HTMLInputElement>('.slot-column .slot-id')
+      first?.focus()
+    })
+  }
+  const exportReady = !pilotDraft && (inputs.length > 0 || outputs.length > 0)
   const setList = (key: string, list: SlotValue[]): void => setValue(key, list)
 
   const addFromEyedropper = (key: string): void => {
@@ -175,13 +209,14 @@ export function BenchView(): JSX.Element {
         </datalist>
         <span
           className={`badge${pilotDraft ? ' badge-accent' : isGeneric && !pilotType ? ' badge-warn' : ''}`}
-          title={
-            pilotDraft
-              ? '结构化编辑：以原始 JSON 为权威，脏字段可追踪、未建模字段原样保留、提交前校验哈希'
-              : '通用模式：自由表单 + 额外 JSON 字段，不就地改写原始配方'
-          }
+          title={pilotDraft ? MODE_NOTES.structured : pilotType ? MODE_NOTES.pilotIdle : MODE_NOTES.generic}
         >
           {pilotDraft ? '结构化编辑' : pilotType ? '试点类型 · 未载入' : '通用模式'}
+        </span>
+        {/* D2：写盘目标常驻可见——任何时候都能回答"这一次提交会写到哪" */}
+        <span className={`write-target${pilotDraft ? ' is-draft' : ''}`} title={writeTarget.detail}>
+          <Icon name="save" size={12} />
+          <span className="write-target-label truncate">写入：{writeTarget.label}</span>
         </span>
         {pilotType && !pilotDraft ? (
           <button
@@ -224,12 +259,7 @@ export function BenchView(): JSX.Element {
         ) : (
           <>
             {inputs.length === 0 && outputs.length === 0 ? (
-              <div className="bench-hint">
-                <Icon name="info" size={14} />
-                <span>
-                  工作台是空的：在左侧搜索物品并拖进槽位，或到「配方浏览」里选一条现有配方点「载入工作台」，也可以用上方的类型输入框切换配方类型。
-                </span>
-              </div>
+              <StartHerePanel entries={entryStates} onPick={onPickEntry} />
             ) : null}
             <div className="bench-cols">
               <SlotColumn
@@ -313,9 +343,15 @@ export function BenchView(): JSX.Element {
         </button>
         <button
           className="btn btn-primary btn-sm"
-          disabled
-          title="通用模式不直接写盘：结构化提交在试点类型（有序合成 / 无序合成 / Create 混合）的会话条里"
-          onClick={() => undefined}
+          disabled={!exportReady}
+          title={
+            pilotDraft
+              ? '结构化编辑请用上方会话条里的「提交配方」：那条路径会校验基线并写回源文件'
+              : exportReady
+                ? writeTarget.submitTitle
+                : '先填一个材料或产物，再导出脚本'
+          }
+          onClick={() => useBenchUiStore.getState().setWriteOpen(true)}
         >
           <Icon name="save" size={14} />
           写入文件

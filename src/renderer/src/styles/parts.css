@@ -1061,6 +1061,97 @@
   text-transform: uppercase;
 }
 
+/* ───────────────────────── 失败面板（第 115 批 D3） ───────────────────────── */
+/*
+ * 一套面板覆盖「读不了源文件 / 写盘失败 / 通道不可用 / 冲突已另行实现」四类失败。
+ * 只用语义色 + color-mix 派生描边，四套主题自动跟随（见 tokens.css 的 --err-* 派生规则）。
+ */
+
+.failure-panel {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--err-line);
+  border-radius: var(--r-lg);
+  background: var(--err-soft);
+}
+
+.failure-head {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: flex-start;
+}
+
+.failure-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--err-tint);
+  color: var(--err);
+  flex: 0 0 auto;
+}
+
+.failure-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.failure-copy strong {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  color: var(--err);
+  margin-bottom: 2px;
+}
+
+.failure-code {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--err-line);
+  background: var(--err-wash);
+  color: var(--err);
+  font-size: var(--fs-badge);
+  font-weight: var(--fw-medium);
+}
+
+.failure-copy p {
+  margin: 0;
+  font-size: var(--fs-badge);
+  line-height: var(--lh-body);
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+
+.failure-body {
+  font-size: var(--fs-badge);
+  line-height: var(--lh-body);
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+
+.failure-hint {
+  margin: 0;
+}
+
+.failure-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.failure-actions .failure-dismiss {
+  margin-left: auto;
+}
+
 /* ───────────────────────── 浮层 / 模态 ───────────────────────── */
 
 .overlay {

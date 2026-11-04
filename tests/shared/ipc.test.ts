@@ -14,7 +14,9 @@ describe('IPC 契约完整性', () => {
 
   it('通道名一律带领域前缀，便于日志与来源过滤', () => {
     for (const name of INVOKE_CHANNELS) {
-      expect(name).toMatch(/^(app|ui|modpack|items|favorites|probe|recipes|schema|plugins|codegen|scripts|logs|cache):/)
+      // `source` 是第 115 批续新增的领域：源文件定位（只收 uid，路径由主进程解析）。
+      // 它与 `recipes` 的区别是「作用于源文件而不是配方数据」，故单列一个前缀。
+      expect(name).toMatch(/^(app|ui|modpack|items|favorites|probe|recipes|schema|plugins|codegen|scripts|logs|cache|source):/)
     }
   })
 })

@@ -7,11 +7,42 @@
  *   「脏字段 N」「原始配方已变化」「提交配方 / 保存副本 / 取消草稿 /
  *    重新载入 / 保留我的修改 / 另存为副本」以及 .pilot-unknowns / .pilot-diagnostics / .pilot-preview
  */
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { JSX } from 'react'
 import { useBenchStore } from '../../store/benchStore'
+import { isBlankDraft } from '../../store/draftBridge'
 import { retryConflictRefresh, submitDraft } from '../../store/commitBridge'
+import { callRaw } from '../../api'
 import { Icon } from '../../components/Icon'
+import { FailurePanel } from '../../components/FailurePanel'
+import { useAppStore } from '../../store/appStore'
+import { writeTargetOf } from './editModes'
+
+/** D3：失败码 → 用户能读懂的一句话（术语只留在 code 徽标里） */
+function failureTitle(code: string): string {
+  switch (code) {
+    case 'RAW_UNREADABLE':
+      return '读不到原始配方文件，提交已停止'
+    case 'STALE':
+      return '源文件已经失效'
+    case 'TARGET_VANISHED':
+      return '目标文件已经被外部删除'
+    case 'TARGET_CHANGED':
+      return '目标文件在写入前被外部改动'
+    case 'SAVE_FAILED':
+      return '写入没有成功，原文件未改动'
+    case 'SAVE_VERIFY_FAILED':
+      return '写入后校验失败，已回滚'
+    case 'SAVE_ROLLBACK_FAILED':
+      return '写入失败且回滚异常，请先检查该文件'
+    case 'BACKUP_FAILED':
+      return '备份失败，未写入任何内容'
+    case 'INVALID_RECIPE':
+      return '配方内容不完整，被拒绝写入'
+    default:
+      return '提交没有完成'
+  }
+}
 
 export function PilotDraftPanel(): JSX.Element | null {
   const draft = useBenchStore((s) => s.draft)
@@ -20,6 +51,11 @@ export function PilotDraftPanel(): JSX.Element | null {
   const bench = useBenchStore((s) => s.bench)
   const committing = useBenchStore((s) => s.committing)
   const lastCommit = useBenchStore((s) => s.lastCommit)
+  const commitFailure = useBenchStore((s) => s.commitFailure)
+  const setCommitFailure = useBenchStore((s) => s.setCommitFailure)
+  const toast = useAppStore((s) => s.toast)
+  // 第 115 批续：主进程拒绝定位（包外 / 文件没了 / 没有独立文件）后，本按钮降级为"复制路径"
+  const [revealBroken, setRevealBroken] = useState(false)
   const getPreview = useBenchStore((s) => s.getDraftPreview)
   const cancelDraft = useBenchStore((s) => s.cancelDraft)
   const reload = useBenchStore((s) => s.resolveConflictReload)
@@ -31,15 +67,47 @@ export function PilotDraftPanel(): JSX.Element | null {
   const copyMode = draft.meta.base === null
   const dirty = draft.meta.dirtyFields.length
   const canSubmit = !committing && !conflict && !draft.unsafeReason && draft.meta.dirtyFields.length > 0
+  const target = writeTargetOf({
+    hasDraft: true,
+    copyMode,
+    blank: isBlankDraft(draft),
+    sourcePath: draft.normalized.source.sourcePath
+  })
+  // D2：无论能不能提交，title 都要先说清"会写到哪"（覆盖哪个文件 / 新建文件），再解释为什么现在不能点
   const submitHint = conflict
     ? '先处理冲突才能提交'
     : draft.unsafeReason
       ? draft.unsafeReason
-      : draft.meta.dirtyFields.length === 0
-        ? '没有修改需要保存'
-        : copyMode
-          ? '另存为新的 recipe_studio 数据包配方（不覆盖原配方）'
-          : '重新校验原始基线并写盘；失败不会清空草稿'
+      : dirty === 0
+        ? `${target.submitTitle}；当前没有修改需要保存`
+        : `${target.submitTitle}；失败不会清空草稿`
+
+  const copySourcePath = (): void => {
+    const path = draft.normalized.source.sourcePath
+    if (!path) return
+    void navigator.clipboard?.writeText(path)
+    toast('源文件路径已复制，可粘贴到资源管理器定位', 'info')
+  }
+
+  /**
+   * 第 115 批续：只把 uid 交给主进程，路径解析与越界校验都在主进程做。
+   * 被拒绝时不弹新面板——把本动作降级成"复制路径"并说明原因（不静默失败）。
+   */
+  const revealSourceFile = async (): Promise<void> => {
+    const uid = draft.normalized.source.uid
+    const res = await callRaw('source:reveal', { uid }).catch((err: unknown) => ({
+      ok: false as const,
+      error: err instanceof Error ? err.message : String(err),
+      code: 'BRIDGE'
+    }))
+    if (res.ok) {
+      toast(`已在资源管理器中定位：${res.data.relativePath}`, 'success')
+      return
+    }
+    setRevealBroken(true)
+    copySourcePath()
+    toast(`无法打开所在目录（${res.code ?? '未知'}）：${res.error}；已改为复制路径`, 'warn')
+  }
 
   return (
     <section className="pilot-panel" aria-label="试点草稿">
@@ -85,6 +153,51 @@ export function PilotDraftPanel(): JSX.Element | null {
           <span>{banner.text}</span>
         </div>
       ))}
+
+      {!conflict && commitFailure ? (
+        // D3：读不了原始 / 写盘失败不再只丢一个 9 秒 toast——面板留着，给出能点的出路
+        <FailurePanel
+          className="pilot-failure"
+          title={failureTitle(commitFailure.code)}
+          message={commitFailure.message}
+          code={commitFailure.code}
+          actions={[
+            { label: '重试读取', onClick: () => void submitDraft(), variant: 'primary', title: '重新读一次磁盘上的源文件并重新校验；失败不会清空草稿' },
+            ...(revealBroken
+              ? [
+                  {
+                    label: '复制路径（打开目录不可用）',
+                    onClick: copySourcePath,
+                    disabled: !draft.normalized.source.sourcePath,
+                    title: '上次定位被拒绝，已降级为复制路径'
+                  }
+                ]
+              : [
+                  {
+                    label: '打开所在目录',
+                    onClick: () => void revealSourceFile(),
+                    disabled: !draft.normalized.source.sourcePath,
+                    title: draft.normalized.source.sourcePath
+                      ? `在资源管理器中选中 ${draft.normalized.source.sourcePath}（只定位，不打开文件）`
+                      : '新建配方还没有源文件'
+                  },
+                  {
+                    label: '复制路径',
+                    onClick: copySourcePath,
+                    disabled: !draft.normalized.source.sourcePath,
+                    title: '打不开资源管理器时的兜底：把源文件路径复制到剪贴板'
+                  }
+                ]),
+            { label: '取消草稿', onClick: cancelDraft, title: '丢弃草稿，原始文件保持不动' }
+          ]}
+          onDismiss={() => setCommitFailure(null)}
+        >
+          <p className="failure-hint">
+            草稿已保留：收起这个提示不会丢掉你改过的内容，原始文件也没有被改动。
+            {draft.normalized.source.sourcePath ? `源文件：${draft.normalized.source.sourcePath}` : null}
+          </p>
+        </FailurePanel>
+      ) : null}
 
       {!conflict && conflictLoadFailed ? (
         // P3-22a：提交撞 CONFLICT 后读取最新原始失败——显式冲突态 + 可操作出路，提交按钮保持可用

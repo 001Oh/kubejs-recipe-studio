@@ -26,11 +26,30 @@ const FAILURE_HINTS: Record<string, string> = {
   SAVE_VERIFY_FAILED: '写入后校验失败，已回滚到提交前内容；草稿已保留'
 }
 
+/**
+ * 第 115 批 D3：需要面板级出路的失败码（读不了原始 / 写盘失败 / 目标消失或被改）。
+ * NO_DRAFT / BUSY / NO_CHANGES / CONFLICT_PENDING 属于"操作不成立"，toast 足够。
+ */
+const PANEL_CODES = new Set([
+  'RAW_UNREADABLE',
+  'STALE',
+  'TARGET_VANISHED',
+  'TARGET_CHANGED',
+  'INVALID_RECIPE',
+  'SAVE_FAILED',
+  'SAVE_VERIFY_FAILED',
+  'SAVE_ROLLBACK_FAILED',
+  'BACKUP_FAILED',
+  'COMMIT_FAILED'
+])
+
 function failWithHint(message: string, code: string): SubmitOutcome {
   const hint = FAILURE_HINTS[code]
   const text = hint ? `${message}（${hint}）` : message
   useAppStore.getState().toast(text, 'error')
   useAppStore.getState().pushLog('ERROR', 'RECIPE', `提交失败[${code}]：${text}`)
+  // D3：toast 会自己消失。这些失败码必须留一个"能点"的出路，交给会话条里的失败面板。
+  if (PANEL_CODES.has(code)) useBenchStore.getState().setCommitFailure({ code, message: text })
   return { ok: false, code, error: text }
 }
 
@@ -68,6 +87,7 @@ function applyCommitted(result: CommitRecipeResult): void {
     },
     draftConflict: null,
     conflictLoadFailed: false,
+    commitFailure: null,
     loadedFrom: result.savedUid,
     lastCommit: { path: result.savedPath, uid: result.savedUid, at: Date.now() }
   })
@@ -83,7 +103,7 @@ async function refreshConflict(uid: string): Promise<void> {
     useAppStore.getState().pushLog('ERROR', 'RECIPE', `冲突后读取最新原始失败：${uid}`)
     return
   }
-  useBenchStore.setState({ conflictLoadFailed: false })
+  useBenchStore.setState({ conflictLoadFailed: false, commitFailure: null })
   // 只挂起冲突，绝不在这里替换用户草稿（默认不覆盖）
   useBenchStore.setState({ draftConflict: opened })
   useAppStore
@@ -110,7 +130,7 @@ export async function submitDraft(): Promise<SubmitOutcome> {
 
   // T-28：空白草稿无索引记录 → 走 create；其余沿用 overwrite/copy 不变
   const mode = isBlankDraft(draft) ? 'create' : draft.meta.base ? 'overwrite' : 'copy'
-  useBenchStore.setState({ committing: true })
+  useBenchStore.setState({ committing: true, commitFailure: null })
   try {
     const res = await callRaw('recipes:commit', {
       uid: draft.normalized.source.uid,

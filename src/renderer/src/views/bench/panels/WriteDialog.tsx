@@ -2,7 +2,7 @@
  * 写入文件对话框（规格 3.7）：通道 / 文件名 / 新建或追加 / 覆盖二次确认，
  * 写前调 codegen:checkTarget 展示 ID 冲突与生效链，失败按 EACCES/EPERM 提供另存出口。
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import type { GenerationChannel } from '@shared/types'
 import type { ScriptEntry } from '@shared/ipc'
@@ -11,6 +11,7 @@ import { SCRIPT_FILE_PREFIX } from '@shared/constants'
 import { call, callOrThrow, callRaw } from '../../../api'
 import { useAppStore } from '../../../store/appStore'
 import { useBenchStore } from '../../../store/benchStore'
+import { FailurePanel, type FailureAction } from '../../../components/FailurePanel'
 import { useBenchUiStore } from '../benchUiStore'
 
 function defaultFileName(): string {
@@ -27,6 +28,38 @@ const CHANNELS: { value: GenerationChannel; label: string }[] = [
   { value: 'datapack-json', label: '数据包 · 原生 JSON' }
 ]
 
+function channelLabel(channel: GenerationChannel): string {
+  return CHANNELS.find((c) => c.value === channel)?.label ?? channel
+}
+
+/** D3：失败码 → 一句话标题（术语只留在 code 徽标里，正文仍是主进程给的原因） */
+function writeFailureTitle(code: string): string {
+  if (/EACCES|EPERM/.test(code)) return '目标目录不可写'
+  switch (code) {
+    case 'CHANNEL_UNAVAILABLE':
+      return '这个通道在当前整合包下用不了'
+    case 'SYNTAX_CHECK_FAILED':
+      return '生成的脚本没通过语法预检'
+    case 'VALIDATION_FAILED':
+      return '生成结果不可写盘'
+    case 'NO_TYPE':
+      return '还没选配方类型'
+    case 'BRIDGE':
+      return '与主进程的连接中断'
+    case 'SCRIPTS_LIST':
+      return '读不到现有脚本列表'
+    default:
+      return '写盘没有完成'
+  }
+}
+
+/** 统一成「写入失败（CODE）：原因」这一种句式；已经是完整句子的（桥异常/脚本列表）原样保留 */
+function failureMessage(error: { message: string; code: string }): string {
+  const text = error.message
+  if (/^(写入|读不到|脚本列表)/.test(text)) return text
+  return `写入失败${error.code ? `（${error.code}）` : ''}：${text}`
+}
+
 export function WriteDialog(): JSX.Element | null {
   const open = useBenchUiStore((s) => s.writeOpen)
   const setOpen = useBenchUiStore((s) => s.setWriteOpen)
@@ -42,6 +75,9 @@ export function WriteDialog(): JSX.Element | null {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<WriteResult | null>(null)
   const [error, setError] = useState<{ message: string; code: string } | null>(null)
+  /** 本次预览推荐的通道：通道不可用时的"换通道"去处 */
+  const [previewChannel, setPreviewChannel] = useState<GenerationChannel | null>(null)
+  const channelSelect = useRef<HTMLSelectElement | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -52,7 +88,10 @@ export function WriteDialog(): JSX.Element | null {
     void call('codegen:preview', { workbench: useBenchStore.getState().bench })
       .then((p) => {
         const ch = (p as { channel?: GenerationChannel } | null)?.channel
-        if (ch) setChannel(ch)
+        if (ch) {
+          setChannel(ch)
+          setPreviewChannel(ch)
+        }
       })
       .catch(() => undefined)
     void callOrThrow('scripts:list')
@@ -130,6 +169,55 @@ export function WriteDialog(): JSX.Element | null {
     void submit(picked.path)
   }
 
+  /**
+   * D3：失败面板的动作按失败类型给，不做"一排通用按钮"。
+   * - 校验类（语法/字段/没类型）：推荐出路是回去改配方类型，重试没有意义
+   * - 通道类：推荐去处是换通道
+   * - 权限类：多一个「另存到其它目录」
+   */
+  const failureActions = (): FailureAction[] => {
+    if (!error) return []
+    const validation = error.code === 'SYNTAX_CHECK_FAILED' || error.code === 'VALIDATION_FAILED' || error.code === 'NO_TYPE'
+    const actions: FailureAction[] = []
+    if (validation) {
+      actions.push({
+        label: '改配方类型',
+        variant: 'primary',
+        onClick: () => {
+          setOpen(false)
+          // BenchView 已监听该事件：关闭对话框后把光标放到「配方类型」输入框
+          window.dispatchEvent(new CustomEvent('studio:focus-type-select'))
+        },
+        title: '关闭对话框，回到工作台的「配方类型」输入框填一个具体类型'
+      })
+    }
+    if (!validation) {
+      actions.push({ label: '重试', onClick: () => void submit(null), variant: 'primary', disabled: busy })
+    }
+    actions.push({
+      label: '换通道',
+      onClick: () => {
+        if (previewChannel && previewChannel !== channel) {
+          setChannel(previewChannel)
+          toast(`已切到推荐通道：${channelLabel(previewChannel)}，再点「写入文件」即可`, 'info')
+          return
+        }
+        channelSelect.current?.focus()
+        toast('在「通道」下拉里换一个再重试（不同通道写到不同位置）', 'info')
+      },
+      disabled: busy,
+      title: `当前通道：${channelLabel(channel)}${previewChannel && previewChannel !== channel ? `；推荐：${channelLabel(previewChannel)}` : ''}`
+    })
+    if (/EACCES|EPERM/.test(error.code)) {
+      actions.push({
+        label: '另存到其它目录',
+        onClick: () => void saveElsewhere(),
+        title: '该目录不可写，可另存到桌面等位置（生成内容不变）'
+      })
+    }
+    return actions
+  }
+
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label="写入文件" onClick={() => setOpen(false)}>
       <div className="modal write-modal" onClick={(e) => e.stopPropagation()}>
@@ -138,7 +226,12 @@ export function WriteDialog(): JSX.Element | null {
 
         <div className="bench-row">
           <label className="aux">通道</label>
-          <select className="input" value={channel} onChange={(e) => setChannel(e.target.value as GenerationChannel)}>
+          <select
+            ref={channelSelect}
+            className="input"
+            value={channel}
+            onChange={(e) => setChannel(e.target.value as GenerationChannel)}
+          >
             {CHANNELS.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
@@ -202,19 +295,17 @@ export function WriteDialog(): JSX.Element | null {
         ) : null}
 
         {error ? (
-          <div className="inline-error">
-            <p>
-              写入失败{error.code ? `（${error.code}）` : ''}：{error.message}
-            </p>
-            {/EACCES|EPERM/.test(error.code) ? (
-              <div className="bench-row">
-                <span className="aux">该目录不可写，可另存到桌面等位置（生成内容不变）。</span>
-                <button className="btn" onClick={() => void saveElsewhere()}>
-                  另存到其它目录
-                </button>
-              </div>
-            ) : null}
-          </div>
+          // D3：失败不再只是弹一条 toast + 一行小字——面板给出「重试 / 换通道 / 另存」的出口，
+          // 且 Esc 只收起面板，草稿与对话框状态都不动。
+          <FailurePanel
+            className="write-failure"
+            title={writeFailureTitle(error.code)}
+            message={failureMessage(error)}
+            code={error.code}
+            dismissLabel="收起提示"
+            onDismiss={() => setError(null)}
+            actions={failureActions()}
+          />
         ) : null}
 
         {result ? (

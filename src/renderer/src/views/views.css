@@ -370,6 +370,177 @@
   color: var(--accent);
 }
 
+/* ───────────────── 第 115 批 D1：工作台空态的三个并列入口 ───────────────── */
+
+.bench-empty {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px dashed var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg-panel);
+}
+
+.bench-empty-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.bench-empty-head .subtle {
+  font-size: var(--fs-badge);
+}
+
+.bench-empty-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.edit-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+}
+
+.edit-entry.is-disabled {
+  background: var(--bg-inset);
+  border-style: dashed;
+}
+
+.edit-entry-ordinal {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: var(--fs-badge);
+  font-weight: var(--fw-semibold);
+}
+
+.edit-entry.is-disabled .edit-entry-ordinal {
+  background: var(--bg-hover);
+  color: var(--fg-subtle);
+}
+
+.edit-entry-body {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.edit-entry-body strong {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  color: var(--fg);
+}
+
+.edit-entry.is-disabled .edit-entry-body strong {
+  color: var(--fg-muted);
+}
+
+.edit-entry-when {
+  font-size: var(--fs-badge);
+  line-height: var(--lh-body);
+  color: var(--fg-muted);
+}
+
+.edit-entry-reason {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-badge);
+  color: var(--warn);
+}
+
+/* D2：写盘目标常驻标签（徽标右侧） */
+
+.write-target {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 300px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--bg-inset);
+  color: var(--fg-muted);
+  font-size: var(--fs-badge);
+  white-space: nowrap;
+}
+
+.write-target.is-draft {
+  border-color: var(--accent-line);
+  background: var(--accent-softer);
+  color: var(--accent-strong);
+}
+
+.write-target-label {
+  min-width: 0;
+}
+
+.pilot-failure {
+  margin: 0 10px 10px;
+}
+
+.write-failure {
+  margin: 0;
+}
+
+/* D1：设置页里的同一套入口文案（列表形态，信息密度比空态面板高） */
+
+.settings-modes p {
+  margin: 0 0 var(--sp-1);
+}
+
+.settings-mode-list {
+  list-style: none;
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.settings-mode-list li {
+  display: grid;
+  grid-template-columns: 20px max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.settings-mode-ordinal {
+  color: var(--accent-strong);
+  font-size: var(--fs-badge);
+  font-weight: var(--fw-semibold);
+}
+
+.settings-mode-list strong {
+  font-size: var(--fs-aux);
+  font-weight: var(--fw-semibold);
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+.settings-mode-when {
+  font-size: var(--fs-badge);
+  color: var(--fg-muted);
+  min-width: 0;
+}
+
 .slot-id {
   flex: 1 1 auto;
   min-width: 0;
