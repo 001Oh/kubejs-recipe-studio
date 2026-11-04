@@ -203,8 +203,16 @@ function removeStatement(workbench: WorkbenchState): string | null {
   return `event.remove({ ${[...pairs.entries()].map(([k, v]) => `${k}: ${v}`).join(', ')} })`
 }
 
+/**
+ * P3-17：emitTarget 会被原样拼进生成的 JS 表达式，只接受 `event.<ident>(.<ident>)*` 形态。
+ * 插件提供的非法/注入值一律视同「无语法糖」，回退 event.custom；合法值逐字保留，产出不变。
+ */
+const SAFE_EMIT_TARGET = /^event(?:\.[A-Za-z_$][A-Za-z0-9_$]*)+$/
+
 export function resolveSugarTarget(schema: RecipeTypeSchema): string | null {
-  return schema.emitTarget ?? VANILLA_TARGETS[schema.id] ?? null
+  const declared = schema.emitTarget ?? VANILLA_TARGETS[schema.id] ?? null
+  if (declared === null) return null
+  return SAFE_EMIT_TARGET.test(declared) ? declared : null
 }
 
 function finished(header: string, mcVersion: string | null, statements: string[], notes: string[], error: string | null): ScriptEmit {

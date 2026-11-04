@@ -89,7 +89,9 @@ export function registerModpackHandlers(): void {
     }
     try {
       const ui = getUiState()
-      patchUiState({ ...ui, lastModpackPath: null, lastModpackName: null } as never)
+      // P3-17：恢复键声明为 `string?`，清除应写 undefined（JSON 序列化会省略该键）。
+      // 旧写法写 null 并靠 `as never` 掩盖类型不符，会让 uiState 携带契约外的 null。
+      patchUiState({ ...ui, lastModpackPath: undefined, lastModpackName: undefined })
       saveUiState()
       cleared.restoreKey = true
       steps.push('清恢复键')
