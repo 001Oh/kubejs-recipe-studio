@@ -84,30 +84,48 @@ export function WriteDialog(): JSX.Element | null {
   const submit = async (alternateDir: string | null): Promise<void> => {
     setBusy(true)
     setError(null)
-    const res = await callRaw('codegen:write', {
-      workbench: useBenchStore.getState().bench,
-      mode,
-      fileName,
-      appendTo: mode === 'append' ? appendTo : null,
-      channel,
-      overwriteConfirmed: overwrite,
-      alternateDir
-    })
-    setBusy(false)
-    if (res.ok) {
-      setResult(res.data)
-      toast(res.data.message || '已写入', 'success')
-      pushLog('SUCCESS', 'IO', res.data.message || '写入完成', res.data.writtenPaths.join('\n'))
-      if (!res.data.backupPath) setOpen(false)
-      return
+    try {
+      const res = await callRaw('codegen:write', {
+        workbench: useBenchStore.getState().bench,
+        mode,
+        fileName,
+        appendTo: mode === 'append' ? appendTo : null,
+        channel,
+        overwriteConfirmed: overwrite,
+        alternateDir
+      })
+      if (res.ok) {
+        setResult(res.data)
+        toast(res.data.message || '已写入', 'success')
+        pushLog('SUCCESS', 'IO', res.data.message || '写入完成', res.data.writtenPaths.join('\n'))
+        if (!res.data.backupPath) setOpen(false)
+        return
+      }
+      const code = res.code ?? ''
+      setError({ message: res.error || '写入失败', code })
+      pushLog('ERROR', 'IO', `写入失败（${code || '未知错误'}）：${res.error}`)
+    } catch (err) {
+      // P3-22b：桥异常（preload 桥断开等）不能把 busy 卡死在「写入中…」，也不能 unhandled rejection
+      const message = err instanceof Error ? err.message : String(err)
+      setError({ message: `写入请求失败：${message}`, code: 'BRIDGE' })
+      toast(`写入请求失败：${message}`, 'error')
+      pushLog('ERROR', 'IO', `写入请求失败：${message}`)
+    } finally {
+      setBusy(false)
     }
-    const code = res.code ?? ''
-    setError({ message: res.error || '写入失败', code })
-    pushLog('ERROR', 'IO', `写入失败（${code || '未知错误'}）：${res.error}`)
   }
 
   const saveElsewhere = async (): Promise<void> => {
-    const picked = await call('app:pickDirectory', { title: '另存到其它目录（如桌面）' })
+    let picked: { path: string } | null = null
+    try {
+      picked = (await call('app:pickDirectory', { title: '另存到其它目录（如桌面）' })) as { path: string } | null
+    } catch (err) {
+      // P3-22b：目录选择失败同样不冒泡，保持错误横幅可重试
+      const message = err instanceof Error ? err.message : String(err)
+      toast(`目录选择失败：${message}`, 'error')
+      pushLog('ERROR', 'IO', `另存目录选择失败：${message}`)
+      return
+    }
     if (!picked?.path) return
     void submit(picked.path)
   }
