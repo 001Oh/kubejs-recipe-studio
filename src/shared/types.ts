@@ -253,6 +253,16 @@ export interface CoverageReport {
   channelCounts: Record<GenerationChannel, number>
   addons: { modId: string; installed: boolean; suggests?: string }[]
   unsupportedTypes: { type: string; reason: string; suggestion: string }[]
+  /** B120/D-04：配方宇宙（扫描到的全部配方类型种数）——真实口径的分母 */
+  universeTotal: number
+  /** 已装配 schema 的类型种数（= totalTypes，冗余一份方便 UI 直读） */
+  materialized: number
+  /** 配方宇宙里还没有 schema 的类型（排序；非空时主百分比在数学上不可能为 100%） */
+  missingTypes: string[]
+  /** 配方总条数（宇宙全部类型的样本数之和） */
+  totalRecipes: number
+  /** 已装配 schema 的类型覆盖的配方条数 → 主百分比 = coveredRecipes / totalRecipes */
+  coveredRecipes: number
 }
 
 export interface PluginManifest {

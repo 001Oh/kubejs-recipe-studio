@@ -141,7 +141,12 @@ function unsupportedReason(schema: RecipeTypeSchema, facts: CapabilityFacts): { 
   return { reason, suggestion }
 }
 
-/** 覆盖率自检面板数据（规格 3.6.10）：可结构化 / 仅通用模式 / 完全无法添加 + 通道分布。 */
+/** 覆盖率自检面板数据（规格 3.6.10）：可结构化 / 仅通用模式 / 完全无法添加 + 通道分布。
+ *
+ * B120/D-04：主百分比改为**配方条数维度** `coveredRecipes / totalRecipes`——旧实现拿
+ * 「已装配 schema 集合」当全集（27/27=100%），掩盖真实覆盖（宇宙 400+ 种类型仅 27 种有表单）。
+ * `universeTotal / materialized / missingTypes` 钉住「宇宙 vs 已装配」的差距；
+ * 未扫描（无配方事实）时宇宙字段归零、missingTypes 为空，类型维度旧口径照旧回退。 */
 export function buildCoverageReport(schemas: readonly RecipeTypeSchema[], facts: CapabilityFacts = {}, mcVersion: string | null = null): CoverageReport {
   const channelCounts: Record<GenerationChannel, number> = { 'kubejs-sugar': 0, 'event-custom': 0, 'datapack-json': 0 }
   let genericOnly = 0
@@ -150,6 +155,15 @@ export function buildCoverageReport(schemas: readonly RecipeTypeSchema[], facts:
     channelCounts[schema.channel] += 1
     if (schema.capability === 'unsupported') unsupported += 1
     else if (!structurable(schema)) genericOnly += 1
+  }
+  const materialized = new Set(schemas.map((s) => s.id))
+  const universe: string[] = []
+  let totalRecipes = 0
+  let coveredRecipes = 0
+  for (const [type, count] of facts.sampleCounts ?? []) {
+    universe.push(type)
+    totalRecipes += count
+    if (materialized.has(type)) coveredRecipes += count
   }
   const report: CoverageReport = {
     mcVersion,
@@ -164,13 +178,26 @@ export function buildCoverageReport(schemas: readonly RecipeTypeSchema[], facts:
       .map((s) => {
         const { reason, suggestion } = unsupportedReason(s, facts)
         return { type: s.id, reason, suggestion }
-      })
+      }),
+    universeTotal: universe.length,
+    materialized: schemas.length,
+    missingTypes: universe.filter((t) => !materialized.has(t)).sort(),
+    totalRecipes,
+    coveredRecipes
   }
-  const pct = report.totalTypes > 0 ? ((report.structurable / report.totalTypes) * 100).toFixed(1) : '0.0'
+  // 主百分比：有配方事实时用条数维度（真实口径）；未扫描时回退旧的类型维度
+  const pct =
+    report.totalRecipes > 0
+      ? ((report.coveredRecipes / report.totalRecipes) * 100).toFixed(1)
+      : report.totalTypes > 0
+        ? ((report.structurable / report.totalTypes) * 100).toFixed(1)
+        : '0.0'
   logger.info(
     'SCHEMA',
-    `覆盖率自检：配方类型 ${report.totalTypes} 种 / 可结构化编辑 ${report.structurable} 种（${pct}%）/ 仅通用模式 ${report.genericOnly} 种 / 完全无法添加 ${report.unsupported} 种`,
-    `通道分布：语法糖 ${report.channelCounts['kubejs-sugar']} · 数据包 JSON ${report.channelCounts['datapack-json']} · event.custom ${report.channelCounts['event-custom']}`
+    `覆盖率自检：配方宇宙 ${report.universeTotal} 种类型 / ${report.totalRecipes} 条配方；` +
+      `已支持 ${report.materialized} 种，覆盖 ${report.coveredRecipes} 条（${pct}%），暂不能新建 ${report.totalRecipes - report.coveredRecipes} 条`,
+    `已装配集合内部：可结构化编辑 ${report.structurable} / 仅通用模式 ${report.genericOnly} / 完全无法添加 ${report.unsupported}` +
+      `；通道分布：语法糖 ${report.channelCounts['kubejs-sugar']} · 数据包 JSON ${report.channelCounts['datapack-json']} · event.custom ${report.channelCounts['event-custom']}`
   )
   if (report.unsupported > 0) {
     logger.warn(

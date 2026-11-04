@@ -392,6 +392,10 @@ export function SettingsView(): JSX.Element {
 
 function renderCoverage(c: CoverageReport): string {
   const pct = (n: number): string => (c.totalTypes === 0 ? '0.0' : ((n / c.totalTypes) * 100).toFixed(1))
+  // B120/D-04：主口径 = 配方条数维度 coveredRecipes / totalRecipes（旧口径拿已装配集合当
+  // 全集，永远 100%）。未扫描（totalRecipes=0）时没有真实口径可显示，只展示类型维度旧表。
+  const hasUniverse = c.totalRecipes > 0
+  const mainPct = hasUniverse ? ((c.coveredRecipes / c.totalRecipes) * 100).toFixed(1) : null
   const addons = c.addons
     .map((a) => `  ${a.installed ? '✓' : '✗'} ${a.modId}${a.installed || !a.suggests ? '' : `（建议安装 ${a.suggests}）`}`)
     .join('\n')
@@ -401,15 +405,24 @@ function renderCoverage(c: CoverageReport): string {
   return [
     '本整合包配方类型覆盖情况',
     '─────────────────────────────────────────',
-    `  扫描到的配方类型          ${c.totalTypes} 种`,
+    ...(hasUniverse
+      ? [
+          `  配方宇宙                   ${c.universeTotal} 种类型 / ${c.totalRecipes} 条配方`,
+          `  ├─ 已支持（有表单）        ${c.materialized} 种，覆盖 ${c.coveredRecipes} 条 (${mainPct}%)`,
+          `  └─ 暂不能新建              ${c.missingTypes.length} 种 / ${c.totalRecipes - c.coveredRecipes} 条`,
+          ''
+        ]
+      : []),
+    `  已装配的类型中             ${c.totalTypes} 种`,
     `  ├─ 可结构化编辑           ${c.structurable} 种 (${pct(c.structurable)}%)`,
     `  ├─ 仅通用模式可编辑        ${c.genericOnly} 种 (${pct(c.genericOnly)}%)`,
     `  └─ 完全无法添加             ${c.unsupported} 种`,
     '',
     // P0-R3：覆盖度语义易误解。分母是「扫描到的配方类型种数」，不是配方条数；
     // 「仅通用模式可编辑」不等于「不能编辑」。两句话把口径钉在界面上，避免用户误读。
-    '  口径说明：以上百分比的分母是「扫描到的配方类型**种数**」，不是配方条数。',
-    '           「仅通用模式可编辑」表示没有字段级 schema，仍可用原始 JSON 编辑，不是不能改。',
+    '  口径说明：主百分比（如有）的分母是配方**条数**；下面「已装配的类型中」一组',
+    '           的分母是已装配 schema 的类型**种数**。「仅通用模式可编辑」表示没有字段级',
+    '           schema，仍可用原始 JSON 编辑，不是不能改。',
     '',
     '生成通道分布',
     `  ├─ KubeJS 语法糖          ${c.channelCounts['kubejs-sugar']} 种`,
