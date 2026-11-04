@@ -20,6 +20,7 @@
 import type { RecipeSlotSchema, RecipeTypeSchema, SchemaSource } from '../../shared/types'
 import type { SchemaSummary } from '../../shared/ipc'
 import { INFER_FIELD_MIN_RATE, INFER_LOW_CONFIDENCE_SAMPLES } from '../../shared/constants'
+import { recipeTypeNameZh } from '../../shared/recipeTypeNames'
 import { customTypesFile } from '../paths'
 import { readJson, writeJson } from '../cache'
 import { logger } from '../logger'
@@ -349,7 +350,7 @@ export function applyMerge(facts: MergeFacts = {}): RecipeTypeSchema[] {
 
     if (!schema) continue
     const pinnedFlag = pinned.has(typeId)
-    const decided: RecipeTypeSchema = { ...schema, pinned: pinnedFlag, displayName: schema.displayName || displayNameForField(schema.id) }
+    const decided: RecipeTypeSchema = { ...schema, pinned: pinnedFlag, displayName: schema.displayName || recipeTypeNameZh(schema.id, displayNameForField(schema.id)) }
     const next = pinnedFlag ? decided : decideForSchema(decided, facts)
     effective.set(typeId, next)
     out.push(next)

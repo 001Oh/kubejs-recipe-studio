@@ -35,6 +35,7 @@ import { allRecords, typeUniverse } from '../recipes/recipeIndex'
 import { getPluginLoadStatus } from '../plugins/loader'
 import { buildCoverageReport, type CapabilityFacts } from './capability'
 import { displayNameForField } from './naming'
+import { recipeTypeNameZh } from '@shared/recipeTypeNames'
 import {
   allSchemas,
   applyMerge,
@@ -74,7 +75,11 @@ export function pilotToSchema(pilot: NormalizedSchema): RecipeTypeSchema {
   const modId = pilot.id.includes(':') ? pilot.id.slice(0, pilot.id.indexOf(':')) : 'minecraft'
   const base: RecipeTypeSchema = {
     id: pilot.id,
-    displayName: displayNameForField(pilot.id.includes(':') ? pilot.id.slice(pilot.id.indexOf(':') + 1) : pilot.id),
+    // 第 116 批：内置类型显示名走中文映射（负责人要求「所有配方类型都有中文」）
+    displayName: recipeTypeNameZh(
+      pilot.id,
+      displayNameForField(pilot.id.includes(':') ? pilot.id.slice(pilot.id.indexOf(':') + 1) : pilot.id)
+    ),
     modId,
     modDisplayName: modId,
     source: 'builtin',
