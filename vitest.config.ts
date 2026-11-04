@@ -14,16 +14,17 @@ export default defineConfig({
     environment: 'node',
     /**
      * T-10 / D-33：组件级测试需要 DOM。**只对 `tests/renderer/components/**` 生效**，
-     * 其余用例（含 `tests/renderer/*.test.ts` 的既有 13 个纯逻辑用例）仍跑在 node 环境，
+     * 其余用例（含 `tests/renderer/*.test.ts` 的既有纯逻辑用例）仍跑在 node 环境，
      * 因此不改变现有用例的运行环境。
      *
-     * ⚠️ 第 115 批实测：本项在 Windows 上**不生效**。vitest 2.1.9 会用
-     * `path.resolve(root, glob)` 把上面的 glob 转成绝对路径，Windows 得到反斜杠
-     * （`E:\mc kjs\tests\renderer\components\**`），而 micromatch 把反斜杠当转义符 →
-     * 永远匹配不上，组件用例退化成 node 环境报 `document is not defined`。
-     * 因此**权威来源是文件头的 `// @vitest-environment jsdom` 文档注释**
-     * （vitest 直接读源码，跨平台稳定）；本项保留只为非 Windows 环境兜底。
-     * 新增组件测试请照抄该注释。
+     * 权威来源是**文件头文档注释** `// @vitest-environment jsdom`：它由 vitest 直接读源码决定环境，
+     * 与路径、平台、配置解析顺序都无关，跨机器稳定。本项 glob 只是**兜底**——
+     * 万一用例放错目录（不在 components/ 下），也不至于静默退化回 node 报 `document is not defined`。
+     * 新增组件测试请照抄该注释；只有确实需要 DOM 的用例才加。
+     *
+     * 第 116 批更正：第 115 批曾在本注释里断言"本项在 Windows 上不生效"，该结论**作废**。
+     * 探针实测（`tests/renderer/components/` 下不带注释的用例）能正常拿到 `document`，
+     * 0.1.12 的 922 全绿也包含那 8 个文件。当时的失败无法复现，不再作为事实写入配置。
      */
     environmentMatchGlobs: [['tests/renderer/components/**', 'jsdom']],
     globals: false,

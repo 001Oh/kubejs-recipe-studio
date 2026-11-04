@@ -16,8 +16,9 @@ if (!port) throw new Error('recipe.worker 必须在 worker_threads 中运行')
 port.on('message', (msg: RecipeRequest) => {
   if (!msg || typeof msg.jarPath !== 'string') return
   void scanJarRecipes(msg.jarPath)
-    .then((recipes) => {
-      port.postMessage({ id: msg.id, ok: true, payload: recipes })
+    .then((result) => {
+      // payload 直接带上采样结果：不新增消息，也不改 jarPoolCore 的协议
+      port.postMessage({ id: msg.id, ok: true, payload: result })
     })
     .catch((err: unknown) => {
       port.postMessage({ id: msg.id, ok: false, error: err instanceof Error ? err.message : String(err) })

@@ -7,6 +7,7 @@ import type { ItemEntry, ItemHit, HighlightRange } from './types'
 import type { ItemsQuery, ItemsQueryResult } from './ipc'
 import { foldSearchText, normalizeForSearch } from './text'
 import { pinyinIndex } from './pinyin'
+import { hasCjk } from './itemName'
 
 /**
  * 查询规格 = IPC 的 ItemsQuery + 收藏集合（收藏由主进程持久化，不进 IPC 请求体）。
@@ -237,8 +238,10 @@ export class SearchCorpus {
     for (const item of items) {
       // 语料收全量，虚拟属性只记录不过滤（查询期用 virtualMask 判定）
       virtualFlags.push(isVirtualItem(item) ? 1 : 0)
-      // 扫描期已预计算拼音的直接用；缺失时（如缓存里的老记录、单测构造的数据）就地补算
-      const derived = item.pyFull.length > 0 || item.pyInitials.length > 0 ? null : pinyinIndex(item.nameZh)
+      // 扫描期已预计算拼音的直接用；缺失时（如缓存里的老记录、单测构造的数据）就地补算。
+      // 只对含 CJK 的名字补算：外文名（俄/日/法）算拼音没有意义（第 116 批 A-3）
+      const derived =
+        item.pyFull.length > 0 || item.pyInitials.length > 0 || !hasCjk(item.nameZh) ? null : pinyinIndex(item.nameZh)
       const full = combos(derived ? derived.pyFull : item.pyFull)
       const initials = combos(derived ? derived.pyInitials : item.pyInitials)
       const colon = item.id.indexOf(':')

@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import type { ItemEntry } from '../../shared/types'
 import { pinyinIndex } from '../../shared/pinyin'
+import { hasCjk } from '../../shared/itemName'
 import { listAndRead } from './zip'
 import { writeIcon } from './iconWriter'
 import { scanJarEntries } from './itemRules'
@@ -83,7 +84,9 @@ export async function scanJar(
         key = null
       }
     }
-    const py = pinyinIndex(draft.nameZh)
+    // 拼音只对真的含 CJK 的名字构建：外文名（俄/日/法）算拼音没有意义，
+    // 还会让 pinyin-pro 白跑一遍并有极小的耗时开销（第 116 批 A-3）
+    const py = hasCjk(draft.nameZh) ? pinyinIndex(draft.nameZh) : { pyFull: [], pyInitials: [] }
     items.push({
       id: draft.id,
       nameZh: draft.nameZh,

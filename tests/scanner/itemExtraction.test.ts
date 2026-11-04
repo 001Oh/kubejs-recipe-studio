@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ZipEntryInfo } from '@main/scanner/zip'
 import { scanJarEntries } from '@main/scanner/itemRules'
+import { displayName } from '@shared/itemName'
 import { parseAssetEntry, resolveIcon } from '@main/scanner/iconResolve'
 import { fakePng } from '../helpers/zipWriter'
 
@@ -66,7 +67,7 @@ describe('物品 ID 提取（规格 3.2 源 A）', () => {
     expect(ids).toEqual(['mymod:cow_spawn_egg'])
   })
 
-  it('缺中文名时回退英文并计入 missingZh；两者都缺时用 path 转可读形式', () => {
+  it('缺中文名时 nameZh 保持为空、名字落 nameEn（第 116 批 A-3）；两者都缺时用 path 转可读形式', () => {
     const h = harness({
       'assets/mymod/lang/en_us.json': JSON.stringify({ 'item.mymod.only_en': 'Only English' }),
       'assets/mymod/textures/item/no_name_thing.png': fakePng()
@@ -74,8 +75,12 @@ describe('物品 ID 提取（规格 3.2 源 A）', () => {
     const result = scanJarEntries(h.entries, h.read)
     const onlyEn = result.items.find((i) => i.id === 'mymod:only_en')
     const noName = result.items.find((i) => i.id === 'mymod:no_name_thing')
-    expect(onlyEn?.nameZh).toBe('Only English')
-    expect(noName?.nameZh).toBe('No name thing')
+    // 旧契约把英文名塞进 nameZh（"中文名污染"）；新契约只让中文语系 + CJK 进 nameZh
+    expect(onlyEn?.nameZh).toBe('')
+    expect(onlyEn?.nameEn).toBe('Only English')
+    expect(displayName(onlyEn!)).toBe('Only English')
+    expect(noName?.nameZh).toBe('')
+    expect(noName?.nameEn).toBe('No name thing')
     expect(result.missingZh).toBe(2)
   })
 

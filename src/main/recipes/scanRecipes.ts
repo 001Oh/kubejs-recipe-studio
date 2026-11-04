@@ -9,6 +9,9 @@ import { isAborted } from '../scanControl'
 import { mergeChains, scanJsonRecipes, type CollectedRecipe } from './jsonSource'
 import { scanScriptRecipes } from './scriptSource'
 import { allRecords, buildIndex, persist, setIndexElapsed, stats, typeUniverse } from './recipeIndex'
+import { collectAllSamples, resetShapeSamples } from './shapeSampler'
+import { inferShapes } from './inferShapes'
+import { writeInferredShapes } from './shapePersist'
 
 export type EmitProgress = (p: ScanProgress) => void
 
@@ -86,11 +89,28 @@ export async function scanRecipes(emit: EmitProgress, options: ScanRecipesOption
   }
 
   logger.info('SCAN', '开始构建配方库（模组 jar / 数据包 / KubeJS 脚本三源）')
+  // 第 116 批 B1：每轮扫描从空样本集开始；worker 的样本随 jar 结果回传并在这里统一聚合
+  resetShapeSamples()
   const entries = appendBatches([await scanJsonRecipes(modpack, hooks), await scanScriptRecipes(modpack, hooks)])
 
   hooks.onProgress('合并定义链并建立倒排索引', 1, 1)
   const merged = mergeChains(entries)
   buildIndex(merged)
+
+  // 第 116 批 B2/B3：形状聚合是扫描末尾的一次性纯计算，热路径上只有"存一个引用"。
+  // 计入 elapsedMs，让"扫描耗时不增加 >5%"的核对拿到真实数字而不是绕开开销。
+  const shapeStarted = Date.now()
+  const shapes = inferShapes(collectAllSamples())
+  const shapeBuildMs = Date.now() - shapeStarted
+  if (!options.skipPersist) {
+    const file = await writeInferredShapes(modpack.path, shapes, shapeBuildMs)
+    const nonEmpty = Object.values(shapes).filter((s) => s.fields.length > 0).length
+    logger.info(
+      'INDEX',
+      `推断形状已落盘 inferred-shapes.json：${file.typeCount} 种类型 / ${nonEmpty} 种非空 / 采样+聚合 ${shapeBuildMs}ms`,
+      `目录 ${modpack.path}`
+    )
+  }
   const elapsedMs = Date.now() - started
   setIndexElapsed(elapsedMs)
 

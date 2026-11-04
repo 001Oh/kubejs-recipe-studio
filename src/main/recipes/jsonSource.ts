@@ -11,7 +11,8 @@ import type { ModpackInfo } from '../../shared/types'
 import { listAndRead } from '../scanner/zip'
 import { logger } from '../logger'
 import { defaultPoolConcurrency, runJarPoolCore } from '../scanner/jarPoolCore'
-import { scanJarRecipes } from './jarRecipes'
+import { scanJarRecipes, type ScannedJarResult } from './jarRecipes'
+import { mergeShapeSamples } from './shapeSampler'
 import {
   buildRecord,
   JSON_EXT_RE,
@@ -106,15 +107,16 @@ async function scanJars(modpack: ModpackInfo, hooks: ScanHooks, out: CollectedRe
   const workerScript = join(__dirname, 'recipe.worker.js')
   let done = 0
   try {
-    await runJarPoolCore<CollectedRecipe[]>({
+    await runJarPoolCore<ScannedJarResult>({
       jars,
       signal,
       workerScript,
       workerAvailable: existsSync(workerScript),
       concurrency: defaultPoolConcurrency(),
       inline: (jarPath) => scanJarRecipes(jarPath),
-      onResult: (jarPath, recipes) => {
-        for (const rec of recipes) out.push(rec)
+      onResult: (jarPath, result) => {
+        for (const rec of result.recipes) out.push(rec)
+        mergeShapeSamples(result.samples)
         done += 1
         hooks.onProgress?.(`解析 jar 配方 ${done}/${jars.length}：${jarPath.split(/[\\/]/).pop()}`, done, jars.length)
       },

@@ -6,8 +6,15 @@
 import { basename } from 'node:path'
 import { listAndRead } from '../scanner/zip'
 import { RANK_JAR, RECIPE_ENTRY_RE, buildRecord, recipeIdFromEntry, type CollectedRecipe } from './record'
+import { drainShapeSamples, type ShapeSampleBatch } from './shapeSampler'
 
-export async function scanJarRecipes(jarPath: string): Promise<CollectedRecipe[]> {
+/** 单个 jar 的产物：摘要列表 + 本 jar 采到的形状样本（可结构化克隆，worker 回传用） */
+export interface ScannedJarResult {
+  recipes: CollectedRecipe[]
+  samples: ShapeSampleBatch[]
+}
+
+export async function scanJarRecipes(jarPath: string): Promise<ScannedJarResult> {
   const jarName = basename(jarPath)
   // P-OPT4-S2：合并「列目录 + 读取」，单 jar 只遍历一次中央目录
   const wanted: string[] = []
@@ -18,7 +25,7 @@ export async function scanJarRecipes(jarPath: string): Promise<CollectedRecipe[]
       return true
     }
   })
-  if (wanted.length === 0) return []
+  if (wanted.length === 0) return { recipes: [], samples: [] }
   const out: CollectedRecipe[] = []
   for (const entry of wanted) {
     const recipeId = recipeIdFromEntry(entry)
@@ -39,5 +46,6 @@ export async function scanJarRecipes(jarPath: string): Promise<CollectedRecipe[]
       orderKey: `0/${jarName}/${entry}`
     })
   }
-  return out
+  // 本 jar 采到的样本随结果一起回主进程（worker 里同样是这一行）
+  return { recipes: out, samples: drainShapeSamples() }
 }

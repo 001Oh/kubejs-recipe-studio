@@ -72,7 +72,10 @@ export function modpackCacheDir(modpackPath: string): string {
   return join(cacheRootDir(), modpackHash(modpackPath))
 }
 
-export function cacheFile(modpackPath: string, name: 'items' | 'recipes' | 'meta' | 'probe' | 'schemas'): string {
+export function cacheFile(
+  modpackPath: string,
+  name: 'items' | 'recipes' | 'meta' | 'probe' | 'schemas' | 'inferred-shapes'
+): string {
   return join(modpackCacheDir(modpackPath), `${name}.json`)
 }
 

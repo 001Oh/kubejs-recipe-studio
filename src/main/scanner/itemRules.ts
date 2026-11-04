@@ -9,11 +9,14 @@
  */
 import type { Confidence } from '../../shared/types'
 import { isVirtualByNamingRules } from '../../shared/search'
+import { hasCjk } from '../../shared/itemName'
 import { readableFromPath } from '../../shared/text'
 import type { ZipEntryInfo } from './zip'
 import { parseAssetEntry, resolveIcon } from './iconResolve'
 
 const LANG_PRIORITY = ['zh_cn', 'en_us']
+/** 只有这三种语系的名字才可能是"中文名"，且还要再过一遍 CJK 检测 */
+const ZH_LOCALES = ['zh_cn', 'zh_tw', 'zh_hk']
 const RANK: Record<Confidence, number> = { lang: 4, block: 3, model: 2, texture: 1 }
 
 /** 明显的非物品资源（子路径逐段匹配；`_spawn_egg` 必须保留） */
@@ -113,30 +116,41 @@ function collectLang(
   return { byLocale, itemKeys, blockKeys }
 }
 
-function nameFrom(
+/**
+ * 取物品的中文名 / 英文名（第 116 批 A-3 收紧口径）。
+ *
+ * - `zh`：**只**来自 zh_cn / zh_tw / zh_hk，且必须真的含 CJK。没汉化就是空串——
+ *   不能再用俄/日/法名冒充中文名（那会让 33.6% 的物品显示成外文且拼音搜索全失效）。
+ * - `en`：en_us → 其它 en*；都没有时才拿"某个非中文语系的名字"兜底（俄/日/法名比路径好看），
+ *   最后才退化为路径可读形式。
+ * - 显示层用 `displayName()`（nameZh || nameEn || id），未汉化时打小标记。
+ */
+export function nameFrom(
   id: string,
   byLocale: Map<string, Map<string, string>>
 ): { zh: string; en: string; hasZh: boolean } {
   let zh = ''
+  for (const locale of ZH_LOCALES) {
+    const hit = byLocale.get(locale)?.get(id)
+    if (hit && hasCjk(hit)) {
+      zh = hit
+      break
+    }
+  }
+
   let en = ''
   for (const locale of LANG_PRIORITY) {
+    if (!locale.startsWith('en')) continue
     const hit = byLocale.get(locale)?.get(id)
-    if (locale === 'zh_cn' && hit) zh = hit
-    if (locale === 'en_us' && hit) en = hit
-  }
-  if (!zh) {
-    for (const [locale, names] of byLocale) {
-      if (locale === 'zh_cn' || locale === 'en_us') continue
-      const hit = names.get(id)
-      if (hit) {
-        zh = hit
-        break
-      }
+    if (hit) {
+      en = hit
+      break
     }
   }
   if (!en) {
+    // 非中英语言的本地化名：只是"比路径好看"的兜底，不算汉化
     for (const [locale, names] of byLocale) {
-      if (!locale.startsWith('en')) continue
+      if (locale.startsWith('zh') || locale.startsWith('en')) continue
       const hit = names.get(id)
       if (hit) {
         en = hit
@@ -144,10 +158,10 @@ function nameFrom(
       }
     }
   }
+
   const path = id.slice(id.indexOf(':') + 1)
   const readable = readableFromPath(path)
-  // 注意顺序：中文名回退要依次用「中文 → 英文 → 路径可读形式」，不能直接读还没算出来的 en
-  return { zh: zh || en || readable, en: en || readable, hasZh: zh !== '' }
+  return { zh, en: en || readable, hasZh: zh !== '' }
 }
 
 /**

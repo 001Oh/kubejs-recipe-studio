@@ -5,6 +5,7 @@
  */
 import type { RecipeRecord, RecipeSource } from '../../shared/types'
 import { extractRecipeIo } from './heuristics'
+import { noteShapeSample } from './shapeSampler'
 
 /** 游戏加载顺序权重：模组 jar → 数据包（datapacks/、openloader）→ kubejs/data → 脚本（规格 3.6.5 ②） */
 export const RANK_JAR = 0
@@ -63,6 +64,9 @@ export function buildRecord(opts: RecordInput): RecipeRecord {
     // 必须先取 JSON 自带的 type 再解析：把空 type 传给启发式会让所有配方都判成 partial（实测过一次）
     const jsonType = typeOf(json)
     const type = opts.type || (jsonType === 'unknown' ? '' : jsonType)
+    // 第 116 批 B1：只把**已解析对象**的引用交给采样器（O(1)，不拷贝、不二次读 jar）。
+    // 形状在扫描结束后统一聚合；这里不碰解析结果、不碰索引结构。
+    noteShapeSample(type, json)
     const parsed = extractRecipeIo(type, json)
     return {
       ...base,
