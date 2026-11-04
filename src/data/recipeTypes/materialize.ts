@@ -13,12 +13,19 @@
 import type { NormalizedSchema, NormalizedSchemaSlot } from '../../shared/schemaModel'
 
 import type { RawSchema, SlotInit } from './_helper'
-import { botaniaSchemas } from './botania'
+import { arsNouveauSchemas, botaniaSchemas, pneumaticcraftSchemas } from './botania'
 import { immersiveengineeringSchemas } from './immersiveengineering'
 import { thermalSchemas } from './thermal'
 
 /** 逐包注册：modId → RawSchema 集合。新增内置库 = 在这里加一行。 */
-const L0_PACKS: readonly RawSchema[][] = [thermalSchemas, botaniaSchemas, immersiveengineeringSchemas]
+export const L0_PACKS: readonly RawSchema[][] = [
+  thermalSchemas,
+  botaniaSchemas,
+  immersiveengineeringSchemas,
+  // B120/D-06：ars(5) / pnc(5) 此前已声明未接线（botania.ts 内），13 条死代码激活归零
+  arsNouveauSchemas,
+  pneumaticcraftSchemas
+]
 
 export const L0_MOD_IDS: readonly string[] = [...new Set(L0_PACKS.flat().map((r) => r.modId))]
 
@@ -57,13 +64,27 @@ export function materializeRaw(raw: RawSchema): NormalizedSchema {
 }
 
 /**
- * 按包内容过滤：modId 已安装且装有 kubejs 才激活该包的类型。
+ * B120/D-06：jar 实名与配方类型命名空间不同名的模组。
+ * thermal 系的配方 type 是 `thermal:*`（类型命名空间不动），但 jar/模组实名是
+ * `thermal_foundation`——按 `installed.has('thermal')` 匹配永远落空，3 条 L0 永不激活。
+ */
+const MOD_ID_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  thermal: ['thermal_foundation']
+}
+
+function isModInstalled(modId: string, installed: ReadonlySet<string>): boolean {
+  if (installed.has(modId)) return true
+  return (MOD_ID_ALIASES[modId] ?? []).some((alias) => installed.has(alias))
+}
+
+/**
+ * 按包内容过滤：modId（或其 jar 实名别名）已安装且装有 kubejs 才激活该包的类型。
  * `hasKubejs=false` 时整个 L0 层为空（原版家族不受影响）。
  */
 export function activeL0Schemas(modpack: { hasKubejs: boolean; installedModIds: readonly string[] } | null): NormalizedSchema[] {
   if (!modpack?.hasKubejs) return []
   const installed = new Set(modpack.installedModIds)
   return L0_PACKS.flat()
-    .filter((r) => installed.has(r.modId))
+    .filter((r) => isModInstalled(r.modId, installed))
     .map(materializeRaw)
 }

@@ -43,6 +43,42 @@ describe('C-1 materializeRaw：RawSchema → NormalizedSchema', () => {
   })
 })
 
+describe('B120/D-06：ars/pnc 接线 + thermal jar 实名别名 + D-28 钉测', () => {
+  const PACK = { hasKubejs: true, installedModIds: ['thermal_foundation', 'ars_nouveau', 'pneumaticcraft'] }
+
+  it('thermal 以 jar 实名 thermal_foundation 激活，类型 id 仍是 thermal:*', () => {
+    const ids = activeL0Schemas(PACK).map((s) => s.id)
+    expect(ids).toContain('thermal:pulverizer')
+    expect(ids).toContain('thermal:press')
+    expect(ids).toContain('thermal:smelter')
+  })
+
+  it('ars_nouveau 5 条 + pneumaticcraft 5 条按 modId 激活', () => {
+    const ids = activeL0Schemas(PACK).map((s) => s.id)
+    expect(ids.filter((i) => i.startsWith('ars_nouveau:')).length).toBe(5)
+    expect(ids.filter((i) => i.startsWith('pneumaticcraft:')).length).toBe(5)
+  })
+
+  it('installedModIds 仅含 thermal_foundation 时 thermal 全量激活（实测 13 条，台账写 3 条系口径误差）', () => {
+    const ids = activeL0Schemas({ hasKubejs: true, installedModIds: ['thermal_foundation'] }).map((s) => s.id)
+    expect(ids.length).toBe(thermalSchemas.length)
+    expect(ids.every((i) => i.startsWith('thermal:'))).toBe(true)
+  })
+
+  it('D-28：createSchemas 永不进 L0（L0_PACKS 导出钉住）', async () => {
+    const { L0_PACKS } = await import('../../src/data/recipeTypes/materialize')
+    const { createSchemas } = await import('../../src/data/recipeTypes/create')
+    expect(L0_PACKS).not.toContain(createSchemas)
+    const all = L0_PACKS.flat().map((r) => r.id)
+    expect(all.some((id) => id.startsWith('create:'))).toBe(false)
+    expect(
+      activeL0Schemas({ hasKubejs: true, installedModIds: ['create', 'minecraft'] })
+        .map((s) => s.id)
+        .some((id) => id.startsWith('create:'))
+    ).toBe(false)
+  })
+})
+
 describe('C-2 activeL0Schemas：按包内容激活', () => {
   it('裸应用（没有 KubeJS）：一个 L0 类型都不激活——只留原版家族', () => {
     expect(activeL0Schemas({ hasKubejs: false, installedModIds: [...L0_MOD_IDS] })).toEqual([])
