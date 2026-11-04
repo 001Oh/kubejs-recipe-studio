@@ -65,10 +65,27 @@ describe('E-2 validateCommitRequest（纯函数）', () => {
     expect(() => validateCommitRequest(legal())).not.toThrow()
   })
 
-  it('gridRows 缺省视为合法（不强制要求网格尺寸）', () => {
+  it('shaped 缺网格尺寸 → INVALID_REQUEST（禁静默按 3×3 兜底，v3 增补）', () => {
     const req = legal()
     delete (req.workbench as { gridRows?: number }).gridRows
     delete (req.workbench as { gridCols?: number }).gridCols
+    expect(() => validateCommitRequest(req)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_REQUEST' })
+    )
+  })
+
+  it('shaped 只缺一个方向的尺寸同样拒绝', () => {
+    const req = legal()
+    delete (req.workbench as { gridCols?: number }).gridCols
+    expect(() => validateCommitRequest(req)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_REQUEST' })
+    )
+  })
+
+  it('非 shaped 布局缺网格尺寸合法（本就不用网格）', () => {
+    const req = legal({
+      workbench: { typeId: 'minecraft:smelting', layoutKind: 'single_io', values: {}, activeSlotKey: null }
+    })
     expect(() => validateCommitRequest(req)).not.toThrow()
   })
 

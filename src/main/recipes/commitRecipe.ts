@@ -220,13 +220,31 @@ export function validateCommitRequest(req: CommitRecipeRequest): void {
   if (w['typeId'] !== undefined && (typeof w['typeId'] !== 'string' || (w['typeId'] as string).length > 512)) {
     fail('工作台配方类型不正确')
   }
+  // B120/E-2（任务书 v3 增补）：shaped 布局必须显式携带整数 1–9 的网格尺寸——渲染层
+  // 漏发时不得静默按 3×3 兜底（9×9 草稿会被写坏成 3×3）。非 shaped 布局不用网格，缺省合法。
+  const shaped = w['layoutKind'] === 'shaped'
   for (const key of ['gridRows', 'gridCols'] as const) {
     const v = w[key]
-    if (v === undefined) continue
+    if (v === undefined) {
+      if (shaped) fail(`shaped 草稿缺少网格尺寸（${key}）`)
+      continue
+    }
     if (typeof v !== 'number' || !Number.isInteger(v) || v < 1 || v > 9) {
       fail('网格尺寸必须是 1–9 的整数')
     }
   }
+}
+
+/**
+ * B120/E-2（任务书 v3 增补）：shaped 写回必须有显式网格尺寸，删除原 `?? 3` 静默兜底。
+ * validateCommitRequest 已在入口闸过一次；这里是第二道（防 workbench.layoutKind 与
+ * schema.layoutKind 不一致时从两处 denormalize 点漏过）。
+ */
+function shapedGridSize(rows: number | undefined, cols: number | undefined): { rows: number; cols: number } {
+  if (rows === undefined || cols === undefined) {
+    throw new CommitError('shaped 草稿缺少网格尺寸', 'INVALID_REQUEST')
+  }
+  return { rows, cols }
 }
 
 
@@ -363,10 +381,7 @@ export async function commitRecipe(req: CommitRecipeRequest, deps: CommitDeps = 
       dirtyFields: writeDirty,
       ...(schema.layoutKind === 'shaped'
         ? {
-            gridSize: {
-              rows: workbench.gridRows ?? 3,
-              cols: workbench.gridCols ?? 3
-            }
+            gridSize: shapedGridSize(workbench.gridRows, workbench.gridCols)
           }
         : {})
     })
@@ -664,7 +679,7 @@ async function commitCreateRecipe(req: CommitRecipeRequest, deps: CommitDeps = {
     const out = denormalizeRecipe(normalizedApplied, schema, {
       dirtyFields: writeDirty,
       ...(schema.layoutKind === 'shaped'
-        ? { gridSize: { rows: req.workbench.gridRows ?? 3, cols: req.workbench.gridCols ?? 3 } }
+        ? { gridSize: shapedGridSize(req.workbench.gridRows, req.workbench.gridCols) }
         : {})
     })
     if (out.kind !== 'json') throw new Error('反解没有返回 JSON 对象')
