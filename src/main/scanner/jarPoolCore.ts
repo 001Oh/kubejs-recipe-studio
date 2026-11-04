@@ -13,6 +13,7 @@
 import { cpus } from 'node:os'
 import { Worker } from 'node:worker_threads'
 import { SCAN_WORKER_MAX_CONCURRENCY } from '../../shared/constants'
+import { logger } from '../logger'
 
 /** 只暴露核心需要的三个方法，便于测试注入假实现 */
 export interface PoolWorker {
@@ -67,6 +68,19 @@ export function defaultPoolConcurrency(): number {
 
 export function jarBaseName(jarPath: string): string {
   return jarPath.replace(/\\/g, '/').split('/').pop() ?? jarPath
+}
+
+/**
+ * P3-6：业务回调兜底。onResult/onFailed 在 worker 事件回调内同步执行，任一抛错
+ * 即主进程未捕获异常（worker 路径）或 Promise 被业务回调错误拒绝（内联路径）。
+ * 统一转 logger.error（带 jar 名与阶段），不冒泡、不改变计数语义。
+ */
+function safeCall(phase: string, jarPath: string, run: () => void): void {
+  try {
+    run()
+  } catch (err) {
+    logger.error('SCAN', `扫描${phase}抛错：${jarBaseName(jarPath)}`, err instanceof Error ? (err.stack ?? err.message) : String(err))
+  }
 }
 
 export async function runJarPoolCore<T>(opts: JarPoolOptions<T>): Promise<JarPoolResult> {
@@ -124,10 +138,10 @@ async function runWorkers<T>(opts: JarPoolOptions<T>, concurrency: number): Prom
         pending.delete(msg.id)
         if (msg.ok) {
           completed += 1
-          opts.onResult(task.jarPath, msg.payload as T)
+          safeCall('结果回调', task.jarPath, () => opts.onResult(task.jarPath, msg.payload as T))
         } else {
           failed += 1
-          opts.onFailed(task.jarPath, msg.error ?? 'worker 未返回结果')
+          safeCall('失败回调', task.jarPath, () => opts.onFailed(task.jarPath, msg.error ?? 'worker 未返回结果'))
         }
         dispatch(lane)
         maybeDone()
@@ -138,7 +152,7 @@ async function runWorkers<T>(opts: JarPoolOptions<T>, concurrency: number): Prom
         if (task) {
           pending.delete(lane.taskId)
           failed += 1
-          opts.onFailed(task.jarPath, err.message)
+          safeCall('失败回调', task.jarPath, () => opts.onFailed(task.jarPath, err.message))
         }
         lane.current = null
         const idx = lanes.indexOf(lane)
@@ -178,10 +192,11 @@ async function runInline<T>(opts: JarPoolOptions<T>, concurrency: number): Promi
       try {
         const payload = await opts.inline(jarPath)
         completed += 1
+        // 保持原语义：内联路径 onResult 抛错按该 jar 失败处理（catch 之外的兜底只包失败回调）
         opts.onResult(jarPath, payload)
       } catch (err) {
         failed += 1
-        opts.onFailed(jarPath, err instanceof Error ? err.message : String(err))
+        safeCall('失败回调', jarPath, () => opts.onFailed(jarPath, err instanceof Error ? err.message : String(err)))
       }
     }
   }
