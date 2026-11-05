@@ -1,10 +1,11 @@
-/** 五层优先级合并与「插件 + L1 叠加」单测（规格 3.6.14 优先级表 + 架构决策 6）。 */
+/** 五层优先级合并单测（规格 3.6.14 优先级表 + 架构决策 6）＋ applyFieldNames 词典套用。
+ *  B121/D-49.2：「插件 + L1 叠加」契约由 registry.augment 在生产兑现（规格 3.6.3），
+ *  原指向已删平行实现 overlayPluginOntoInferred 的叠加用例同步移除。 */
 import { describe, expect, it } from 'vitest'
 import type { PluginManifest, RecipeSlotSchema, RecipeTypeSchema } from '@shared/types'
 import {
   applyFieldNames,
   LAYER_RANK,
-  overlayPluginOntoInferred,
   planTypeConflicts,
   resolvePluginOverrides,
   schemaRank,
@@ -78,50 +79,7 @@ describe('优先级', () => {
   })
 })
 
-describe('插件与 L1 是叠加关系', () => {
-  const pluginSchema = schema({
-    source: 'plugin',
-    displayName: '神秘学 · 仪式',
-    layoutKind: 'multi_io',
-    slots: [slot('activation_item', '激活物', { role: 'requirement', required: true })],
-    outputs: [slot('result', '产物')],
-    requirements: [{ kind: 'structure', text: '需要法阵' }],
-    notes: ['不消耗模板'],
-    channel: 'datapack-json',
-    capability: 'compatible'
-  })
-  const inferred = schema({
-    source: 'inferred',
-    displayName: 'occultism:ritual',
-    layoutKind: 'single_io',
-    slots: [slot('activation_item', 'activation_item'), slot('ingredients', 'ingredients', { multiple: true }), slot('pentacle_id', 'pentacle_id', { kind: 'choice' })],
-    outputs: [slot('result', 'result'), slot('reward', 'reward')],
-    extraFields: [slot('max_times', 'max_times', { kind: 'number' })],
-    sampleCount: 42,
-    lowConfidence: false
-  })
-  const merged = overlayPluginOntoInferred(pluginSchema, inferred)
-
-  it('插件写过的字段保留插件的叫法与角色', () => {
-    expect(merged.slots[0]?.displayName).toBe('激活物')
-    expect(merged.slots[0]?.role).toBe('requirement')
-    expect(merged.layoutKind).toBe('multi_io')
-    expect(merged.channel).toBe('datapack-json')
-    expect(merged.source).toBe('plugin')
-  })
-
-  it('插件没写的字段由 L1 补全，产物区同样叠加', () => {
-    expect(merged.slots.map((s) => s.key)).toEqual(['activation_item', 'ingredients', 'pentacle_id'])
-    expect(merged.outputs.map((s) => s.key)).toEqual(['result', 'reward'])
-    expect(merged.extraFields?.map((s) => s.key)).toEqual(['max_times'])
-  })
-
-  it('实测样本数留在合并结果里，提示条与注意事项合并不重复', () => {
-    expect(merged.sampleCount).toBe(42)
-    expect(merged.requirements?.map((r) => r.text)).toEqual(['需要法阵'])
-    expect(merged.notes).toEqual(['不消耗模板'])
-  })
-
+describe('字段词典（applyFieldNames）只改没被作者显式命名的槽位', () => {
   it('字段词典只改没被作者显式命名的槽位', () => {
     const renamed = applyFieldNames([slot('pentacle_id', 'pentacle_id'), slot('result', '产物'), slot('nested', 'nested', { kind: 'struct', fields: [slot('inner', 'inner')] })], { pentacle_id: '法阵等级', inner: '内层字段' })
     expect(renamed[0]?.displayName).toBe('法阵等级')

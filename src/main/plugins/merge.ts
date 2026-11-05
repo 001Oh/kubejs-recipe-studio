@@ -7,10 +7,12 @@
  *   ProbeJS / class 推断 L2
  *   L1 反推                  ← 兜底，永远可用
  *
- * **接线现状（P3-1，2026-11-04 复核）**：上表是设计目标；当前实际有数据源的只有
- * 钉住 / 插件 / 内置试点 3 类型。「L0 内置精校库」（src/data/recipeTypes/）与
- * L1 反推层均未接线、无生产数据源——插件没写到的字段目前没有「反推补全」可叠加，
- * 下面第 2 条规则是插件层接入后（或 L0/L1 接线后）才完全生效的契约。
+ * **接线现状（2026-11-06 D-49.2 更新）**：上表五层均已接线（B120/D-05、D-06 接通 L0/L1；
+ * jar 层除外——classParser 已随 D-49.4 删除，ProbeJS 走文本提取 probeImport）。
+ * 规则 2「插件与 L1 叠加」由 registry.augment 在 applyMerge 中兑现（规格 3.6.3：
+ * 出现率 ≥10% 追加为「整合包实测字段」、骨架未出现字段降级「高级（未在本包出现）」）；
+ * 本文件中与该门槛语义不符的早期平行实现 overlayPluginOntoInferred 已删除
+ * （D-49.2，委托方拍板），其专属测试同步移除。
  *
  * 两条容易被写错的规则在这里定死：
  * 1. 同 `type` 被多个插件声明 → 按来源优先级取第一个，其余记为冲突（插件页要能看见）；
@@ -174,38 +176,3 @@ export function buildPluginSchema(decl: PluginTypeDecl, core: PluginManifestCore
   return applyAddonCapability(base, addon)
 }
 
-function missingSlots(claimed: ReadonlySet<string>, pluginList: readonly RecipeSlotSchema[], inferredList: readonly RecipeSlotSchema[]): RecipeSlotSchema[] {
-  const owned = new Set(pluginList.map((s) => s.key))
-  return inferredList.filter((s) => !owned.has(s.key) && !claimed.has(s.key))
-}
-
-/**
- * 叠加合并：插件骨架优先，L1 反推补插件没写的字段。
- * 布局 / emitTarget / 约束以插件为准（那是插件的价值所在），
- * 样本统计（sampleCount / lowConfidence）以 L1 为准（那是实测事实）。
- */
-export function overlayPluginOntoInferred(plugin: RecipeTypeSchema, inferred: RecipeTypeSchema): RecipeTypeSchema {
-  const claimed = new Set(
-    [...plugin.slots, ...plugin.outputs, ...(plugin.extraFields ?? [])].map((s) => s.key)
-  )
-  const slots = [...plugin.slots, ...missingSlots(claimed, plugin.slots, inferred.slots)]
-  const outputs = [...plugin.outputs, ...missingSlots(claimed, plugin.outputs, inferred.outputs)]
-  const extraFields = [...(plugin.extraFields ?? []), ...missingSlots(claimed, plugin.extraFields ?? [], inferred.extraFields ?? [])]
-  const pluginRequirements = new Set((plugin.requirements ?? []).map((r) => r.text))
-  const requirements = [...(plugin.requirements ?? []), ...(inferred.requirements ?? []).filter((r) => !pluginRequirements.has(r.text))]
-  const notes = [...new Set([...(plugin.notes ?? []), ...(inferred.notes ?? [])])]
-  return {
-    ...inferred,
-    ...plugin,
-    slots,
-    outputs,
-    ...(extraFields.length > 0 ? { extraFields } : {}),
-    ...(requirements.length > 0 ? { requirements } : {}),
-    ...(notes.length > 0 ? { notes } : {}),
-    displayName: plugin.displayName || inferred.displayName,
-    modDisplayName: plugin.modDisplayName || inferred.modDisplayName,
-    sampleCount: inferred.sampleCount,
-    lowConfidence: inferred.lowConfidence,
-    source: 'plugin'
-  }
-}
