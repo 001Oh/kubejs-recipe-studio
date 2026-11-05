@@ -49,7 +49,14 @@ export const PILOT_SCHEMAS: Record<string, NormalizedSchema> = {
   'minecraft:smelting': {
     id: 'minecraft:smelting',
     layoutKind: 'single_io',
-    slots: [{ key: 'ingredient', kind: 'item', multiple: true, required: true }],
+    // ⚠ D-37 陷阱一：标量槽声明顺序 = KubeJS 实参顺序（xp 在前、tick 在后），写反会
+    //    静默生成 event.smelting(result, ingredient, 200, 0.35)——顺序由
+    //    tests/codegen/smeltingArgs.test.ts 的反向验证钉死，不可调整。
+    slots: [
+      { key: 'ingredient', kind: 'item', multiple: true, required: true },
+      { key: 'experience', kind: 'number', multiple: false, zone: 'extra', defaultValue: 0, constraints: { min: 0, max: 100 } },
+      { key: 'cookingtime', kind: 'number', multiple: false, zone: 'extra', defaultValue: 200, constraints: { min: 1, max: 72000 } }
+    ],
     outputs: [{ key: 'result', kind: 'item', multiple: false, required: true }],
     revision: 1,
     preserveUnknown: true
@@ -57,7 +64,11 @@ export const PILOT_SCHEMAS: Record<string, NormalizedSchema> = {
   'minecraft:blasting': {
     id: 'minecraft:blasting',
     layoutKind: 'single_io',
-    slots: [{ key: 'ingredient', kind: 'item', multiple: true, required: true }],
+    slots: [
+      { key: 'ingredient', kind: 'item', multiple: true, required: true },
+      { key: 'experience', kind: 'number', multiple: false, zone: 'extra', defaultValue: 0, constraints: { min: 0, max: 100 } },
+      { key: 'cookingtime', kind: 'number', multiple: false, zone: 'extra', defaultValue: 100, constraints: { min: 1, max: 72000 } }
+    ],
     outputs: [{ key: 'result', kind: 'item', multiple: false, required: true }],
     revision: 1,
     preserveUnknown: true
@@ -65,7 +76,11 @@ export const PILOT_SCHEMAS: Record<string, NormalizedSchema> = {
   'minecraft:smoking': {
     id: 'minecraft:smoking',
     layoutKind: 'single_io',
-    slots: [{ key: 'ingredient', kind: 'item', multiple: true, required: true }],
+    slots: [
+      { key: 'ingredient', kind: 'item', multiple: true, required: true },
+      { key: 'experience', kind: 'number', multiple: false, zone: 'extra', defaultValue: 0, constraints: { min: 0, max: 100 } },
+      { key: 'cookingtime', kind: 'number', multiple: false, zone: 'extra', defaultValue: 100, constraints: { min: 1, max: 72000 } }
+    ],
     outputs: [{ key: 'result', kind: 'item', multiple: false, required: true }],
     revision: 1,
     preserveUnknown: true
@@ -73,7 +88,11 @@ export const PILOT_SCHEMAS: Record<string, NormalizedSchema> = {
   'minecraft:campfire_cooking': {
     id: 'minecraft:campfire_cooking',
     layoutKind: 'single_io',
-    slots: [{ key: 'ingredient', kind: 'item', multiple: true, required: true }],
+    slots: [
+      { key: 'ingredient', kind: 'item', multiple: true, required: true },
+      { key: 'experience', kind: 'number', multiple: false, zone: 'extra', defaultValue: 0, constraints: { min: 0, max: 100 } },
+      { key: 'cookingtime', kind: 'number', multiple: false, zone: 'extra', defaultValue: 600, constraints: { min: 1, max: 72000 } }
+    ],
     outputs: [{ key: 'result', kind: 'item', multiple: false, required: true }],
     revision: 1,
     preserveUnknown: true

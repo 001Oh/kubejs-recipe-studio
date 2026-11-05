@@ -15,7 +15,13 @@ function write(field: RecipeSlotSchema, value: number | boolean | string): void 
   setKey(field.key, value)
 }
 
-export function NumberControl({ field }: ControlProps): JSX.Element {
+export function NumberControl({
+  field,
+  onWrite
+}: ControlProps & {
+  /** B124/D-37：可选写入拦截（位置参数回填用）。缺省 = 原行为（setKey），存量调用方零变化 */
+  onWrite?: (field: RecipeSlotSchema, value: number) => void
+}): JSX.Element {
   const raw = useFieldValue(field.key)
   const value = asNumber(raw, Number(field.defaultValue ?? 0))
   const [text, setText] = useState<string | null>(null)
@@ -37,7 +43,7 @@ export function NumberControl({ field }: ControlProps): JSX.Element {
           onChange={(e) => {
             setText(e.target.value)
             const next = Number(e.target.value)
-            if (e.target.value !== '' && Number.isFinite(next)) write(field, next)
+            if (e.target.value !== '' && Number.isFinite(next)) (onWrite ?? write)(field, next)
           }}
           onBlur={() => setText(null)}
         />
