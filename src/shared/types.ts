@@ -58,6 +58,13 @@ export interface ItemEntry {
   virtual: boolean
   /** 该物品是否至少被一条已知配方产出 */
   hasRecipe: boolean
+  /**
+   * 条目来源（B120/D-07）：缺省 = mod jar 扫描派生（历史缓存里没有这个字段，语义等同 'mod'）；
+   * `vanilla` = 内置原版清单在编排层合并进内存索引；`referenced` = 配方引用但无任何定义源，占位兜底。
+   * **只存在于内存索引，不写 items.json**——缓存文件保持纯 mod 派生口径，历史缓存零失效
+   * （`parseItemsCacheJson` 只强校验 id/nameZh，可选字段不影响旧缓存判定）。
+   */
+  source?: 'vanilla' | 'referenced'
 }
 
 export interface HighlightRange {
@@ -305,8 +312,19 @@ export interface ScanProgress {
 }
 
 export interface IndexSummary {
+  /** 内存索引总数 = mod 派生 + 内置原版 + 引用兜底（用户在搜索框里能命中的全集） */
   items: number
   namespaces: number
+  /**
+   * 其中 mod jar 扫描派生的条数（= `items.json` 缓存里的条数）。
+   * B120/D-07：内置原版清单与引用占位只合并进内存、不落盘，
+   * 所以核对「缓存有没有回退」时必须看这个字段，不能看 `items`。
+   */
+  scannedItems?: number
+  /** 内置原版清单（`source:'vanilla'`）本次新增进索引的条数 */
+  vanillaItems?: number
+  /** 引用兜底（`source:'referenced'`）新增条数 */
+  referencedItems?: number
   itemElapsedMs: number
   missingZhNames: number
   placeholderIconRatio: number

@@ -6,6 +6,7 @@ import { registerHandler } from '../ipcRegistry'
 import { getCurrentModpack, getCurrentSummary, readFavorites, setFavorite, setCurrentSummary } from '../modpack/state'
 import { getCorpus, getItemById, getItems, modCounts, setItemIndex } from '../scanner/itemIndex'
 import { runProbeImport } from '../scanner/probeImport'
+import { scannedOnly } from '../vanillaItems'
 import { writeJson } from '../cache'
 import { cacheFile } from '../paths'
 import { logger } from '../logger'
@@ -33,8 +34,10 @@ export function registerItemsHandlers(): void {
     const { items, result } = await runProbeImport(paths, before)
     // 注册表只更新「已注册」标记与新 id，不重扫 jar；语料随索引重建一次（41k 条约 0.4s）
     setItemIndex(items)
-    // items.json 同步写回，避免下次重启丢失 verified 标记（meta 不动，缓存签名不受影响）
-    await writeJson(cacheFile(modpack.path, 'items'), items)
+    // items.json 同步写回，避免下次重启丢失 verified 标记（meta 不动，缓存签名不受影响）。
+    // B120/D-07：必须先滤掉内存合成的原版/引用条目——缓存文件只能存 mod 派生口径，
+    // 否则原版清单会被固化进缓存，随应用版本更新失去可维护性。
+    await writeJson(cacheFile(modpack.path, 'items'), scannedOnly(items))
     const summary = getCurrentSummary()
     if (summary) {
       setCurrentSummary({

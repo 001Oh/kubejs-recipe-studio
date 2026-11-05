@@ -137,18 +137,31 @@ describe('导入 → 物品扫描 → 索引与语料', () => {
     const summary = getCurrentSummary()
     expect(summary).not.toBeNull()
     // 4 条 = ruby / ruby_block / ritual_dummy_x / mystery_thing（debug_tool 按规则排除）
-    expect(summary?.items).toBe(4)
+    // B120/D-07：`items` 现在是**内存索引总数**（mod 派生 + 内置原版 + 引用兜底），
+    // 核对扫描产物要看 `scannedItems`——缓存回退比较必须用它。
+    expect(summary?.scannedItems).toBe(4)
+    expect(summary?.vanillaItems).toBe(1435)
+    expect(summary?.referencedItems).toBe(0)
+    expect(summary?.items).toBe(4 + 1435)
     const items = getItems()
-    expect(items.map((i) => i.id).sort()).toEqual([
+    // mod 派生条目标记为无 source（历史缓存语义），合成条目标 vanilla/referenced
+    expect(items.filter((i) => i.source === undefined).map((i) => i.id).sort()).toEqual([
       'mymod:ritual_dummy_x',
       'mymod:ruby',
       'mymod:ruby_block',
       'othermod:mystery_thing'
     ])
+    // D-07 的核心验收：原版物品进索引、名字正确、来源可辨
+    const emerald = items.find((i) => i.id === 'minecraft:emerald')
+    expect(emerald?.nameZh).toBe('绿宝石')
+    expect(emerald?.source).toBe('vanilla')
+    expect(emerald?.hasIcon).toBe(false)
     // debug_ 资源必须被排除（规格 3.2 的排除规则）
     expect(items.some((i) => i.id === 'mymod:debug_tool')).toBe(false)
     const cached = JSON.parse(readFileSync(cacheFile(modpack.path, 'items'), 'utf8')) as { id: string; virtual: boolean }[]
+    // 缓存文件必须仍是纯 mod 派生口径：合成条目只活在内存里，绝不落盘
     expect(cached).toHaveLength(4)
+    expect(cached.some((i) => i.id === 'minecraft:emerald')).toBe(false)
     expect(cached.find((i) => i.id === 'mymod:ritual_dummy_x')?.virtual).toBe(true)
   })
 
@@ -223,8 +236,13 @@ describe('导入 → 物品扫描 → 索引与语料', () => {
     const again = await startScan(false)
     expect(again.started).toBe(true)
     expect(getCurrentSummary()?.cacheHit).toBe(true)
-    expect(getCurrentSummary()?.items).toBe(4)
+    // 缓存命中也必须重新合并内置清单（合并在内存层，不依赖缓存内容）
+    expect(getCurrentSummary()?.scannedItems).toBe(4)
+    expect(getCurrentSummary()?.items).toBe(4 + 1435)
     expect(getCorpus()?.search({ text: '红宝石', offset: 0, limit: 5, favorites: new Set() }).hits).toHaveLength(2)
+    // 原版物品在缓存命中路径上同样可搜（D-07 验收：不是只有首次扫描才有）
+    const emeraldHit = getCorpus()?.search({ text: '绿宝石', offset: 0, limit: 5, favorites: new Set() }).hits ?? []
+    expect(emeraldHit.map((h) => h.item.id)).toContain('minecraft:emerald')
   })
 })
 

@@ -9,7 +9,7 @@
  * meta 只有在**全部阶段成功**后才落盘；任何阶段抛错或被取消都不写，下次启动必然重扫。
  */
 import { app } from 'electron'
-import type { IndexSummary, ModpackInfo, RecipeStats, ScanProgress } from '../shared/types'
+import type { IndexSummary, ItemEntry, ModpackInfo, RecipeStats, ScanProgress } from '../shared/types'
 import { logger } from './logger'
 import { emitEvent } from './ipcRegistry'
 import { getMainWindow } from './window'
@@ -20,10 +20,11 @@ import { setItemIndex } from './scanner/itemIndex'
 import { endScanSession, startScanSession } from './scanner/scanSession'
 import { isCacheValid, saveCacheMeta } from './cache'
 import { cacheFile } from './paths'
-import { loadFromCache as loadRecipeCache, stats as recipeStats } from './recipes/recipeIndex'
+import { allRecords, loadFromCache as loadRecipeCache, stats as recipeStats } from './recipes/recipeIndex'
 import { createProgressThrottle } from './progressThrottle'
 import { scanRecipes, type EmitProgress } from './recipes/scanRecipes'
 import { buildInferredSchemas } from './schema/inferredSource'
+import { enrichIndex, REFERENCED_LIMIT, VANILLA_LIST_VERSION, type EnrichReport } from './vanillaItems'
 
 export const SCAN_TASK_ID = 'items-scan'
 
@@ -45,12 +46,26 @@ interface Timings {
   totalMs: number
 }
 
-function summaryOf(modpack: ModpackInfo, result: ItemScanResult, recipes: RecipeStats, timings: Timings): IndexSummary {
+function summaryOf(
+  modpack: ModpackInfo,
+  result: ItemScanResult,
+  recipes: RecipeStats,
+  timings: Timings,
+  index?: { total: number; vanilla: number; referenced: number }
+): IndexSummary {
+  // 图标覆盖率与缺汉化口径**只看 jar 扫描产物**：内置原版条目没有图（贴图不在任何 jar 里）、
+  // 引用占位连名字都没有，把它们算进比例会让「占位图 > 5% 视为提取器缺陷」变成假告警。
   const total = result.items.length
   const withIcon = result.stats.withIcon
   const ratio = total === 0 ? 0 : 1 - withIcon / total
   return {
-    items: total,
+    // 索引总数含内存合并进来的原版/引用条目；缓存回退核对看 scannedItems
+    items: index?.total ?? total,
+    scannedItems: total,
+    vanillaItems: index?.vanilla,
+    referencedItems: index?.referenced,
+    // 命名空间数按扫描产物统计：内置清单只会带来 minecraft（本就存在），引用占位可能引入
+    // 无对应 mod 的命名空间，算进来会让「225 个模组 → 231 个命名空间」成为常态噪音
     namespaces: new Set(result.items.map((item) => item.modId)).size,
     itemElapsedMs: result.elapsedMs,
     missingZhNames: result.stats.missingZh,
@@ -140,11 +155,42 @@ export async function startScan(rebuild: boolean, deps: ScanDeps = {}): Promise<
     phase = 'items'
     const tCorpus = Date.now()
     progress('建立搜索语料…', 1, 1, 'items')
-    setItemIndex(items.items)
+    // B120/D-07（T-07，b 方案，委托方 2026-11-05 16:4x 拍板）：
+    // 原版清单与配方引用兜底在**内存索引**里合并，items.json 缓存保持纯 mod 派生口径，
+    // 因此历史缓存零失效、PARSER_VERSION 无需 bump。合并失败不影响扫描结果（降级为仅 mod 条目）。
+    let indexItems: ItemEntry[] = items.items
+    let enrichReport: EnrichReport | null = null
+    try {
+      const enriched = enrichIndex(items.items, allRecords())
+      indexItems = enriched.items
+      enrichReport = enriched.report
+    } catch (err) {
+      logger.warn(
+        'INDEX',
+        '原版物品/引用兜底合并失败，索引仅含 mod 派生条目',
+        err instanceof Error ? err.message : String(err)
+      )
+    }
+    setItemIndex(indexItems)
     const corpusMs = Date.now() - tCorpus
 
     const timings: Timings = { itemsMs, recipesMs, corpusMs, cacheWriteMs: 0, totalMs: Date.now() - startedAt }
-    const summary = summaryOf(modpack, items, recipes, timings)
+    const summary = summaryOf(modpack, items, recipes, timings, {
+      total: indexItems.length,
+      vanilla: enrichReport?.vanillaAdded ?? 0,
+      referenced: enrichReport?.referencedAdded ?? 0
+    })
+    if (enrichReport) {
+      logger.info(
+        'INDEX',
+        `原版物品并入索引（内置清单 ${VANILLA_LIST_VERSION}）：${enrichReport.vanillaTotal} 条中新增 ${enrichReport.vanillaAdded} 条` +
+          `（其中 ${enrichReport.vanillaWithRecipe} 条在本包内有配方）｜引用兜底 ${enrichReport.referencedAdded} 条` +
+          (enrichReport.overflow
+            ? `（配方中缺定义的物品 ${enrichReport.referencedConsidered}+ 条超过上限 ${REFERENCED_LIMIT}，本批整批未收录）`
+            : '') +
+          `｜内存索引共 ${indexItems.length.toLocaleString('zh-CN')} 条（缓存仍 ${items.items.length.toLocaleString('zh-CN')} 条）`
+      )
+    }
     setCurrentSummary(summary)
 
     // ── 阶段 4：提交 meta（只有走到这里才代表「这份缓存完整可用」）
