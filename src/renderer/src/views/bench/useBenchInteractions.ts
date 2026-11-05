@@ -52,15 +52,15 @@ export function useBenchInteractions(): void {
   }, [resolveZone])
 
   useEffect(() => {
-    // 拖到侧边栏 = 清空该槽并打开该材料的配方（递归查看它怎么来的）
+    // 拖到侧边栏 = 清空该槽并打开该材料的配方（仅限真实槽位地址）
     const onOut = (event: Event): void => {
       const detail = (event as CustomEvent<{ slotId: string; value: SlotValue }>).detail
       if (!detail?.slotId || !detail.value) return
       const addr = decodeSlot(detail.slotId)
-      if (addr) commitOps(clearOps(addr))
+      if (!addr) return
+      commitOps(clearOps(addr))
       const app = useAppStore.getState()
       app.selectItem(detail.value.id, 'craft')
-      app.setView('browse')
       app.pushLog('DEBUG', 'UI', `槽位移出 ${detail.value.id}，已打开其配方`)
     }
     window.addEventListener(SLOT_OUT_EVENT, onOut)

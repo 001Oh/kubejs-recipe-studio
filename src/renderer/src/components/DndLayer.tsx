@@ -83,6 +83,8 @@ export function DndLayer({ children }: { children: ReactNode }): JSX.Element {
     const overId = String(e.over.id)
     const insert = shiftRef.current
     if (overId === 'sidebar') {
+      // 仅槽位来源才算「移出工作台」；侧边栏来源拖回侧边栏 = 取消拖拽，不派发事件
+      if (data.origin !== 'slot') return
       window.dispatchEvent(new CustomEvent(SLOT_OUT_EVENT, { detail: { slotId: slotIdOf(data.from ?? ''), value: data.value } }))
       return
     }
