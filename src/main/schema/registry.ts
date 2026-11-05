@@ -3,14 +3,17 @@
  *
  *   用户钉住（customTypesFile）> 插件 > builtin（试点 3 类型）> jar/ProbeJS > 反推
  *
- * **接线现状（P3-1/3-2/3-3，2026-11-04 复核，勿凭本注释臆断运行时能力）**：
- * - 上式是设计目标优先级；当前**实际有数据源的只有三层**：pinned（schema:pin 落盘）、
- *   plugin（插件通道）、builtin（`service.ts` 用 PILOT_SCHEMAS 3 类型填充）。
- * - 「L0 内置库」（`src/data/recipeTypes/`，672 行）当前**未接线、零引用**，不产出数据；
- * - jar/ProbeJS 层与反推层当前也无生产写入方（无 putLayer/putMany 调用），
- *   schemaValidate.ts / schemaMigrate.ts 同样生产零引用；
+ * **接线现状（2026-11-06 D-49 复核后更新）**：
+ * - 实际有数据源的层：pinned（schema:pin 落盘）、plugin（插件通道）、builtin（`PILOT_SCHEMAS`
+ *   8 个原版家族）、l0（`src/data/recipeTypes/`，包内容驱动激活）、inferred（扫描收敛点后台构建）；
+ * - jar/ProbeJS 层无生产写入方（`classParser.ts` 已随 D-49 删除；ProbeJS 走文本提取 `probeImport`）；
+ * - `schemaValidate.ts` **封存**（独立能力：标量槽 constraints enum/integer/min/max、minItems/maxItems、
+ *   mustBe、引用 ID 形态——四个校验器中独有，且 L0 声明已开始产生 constraints 输入；
+ *   接线条件：产品化「L0 标量约束强制」时在 commit/preview 链调用 `validateNormalized`）；
+ * - `schemaMigrate.ts` 已删除（四处 userData 均无历史钉住数据；现行落盘格式即裸数组，
+ *   `loadPinned` 直读的就是它，v2 容器是从未启用的设计）；
  * - 渲染层通用 schema 编辑器（layouts/controls/panels 大部分文件）未挂载，
- *   运行时只有试点三件套 + 通用兜底。详见 README「已实现 / 已接线 / 预留未接线」。
+ *   运行时只有试点编辑器 + 通用兜底。详见 README「已实现 / 已接线 / 预留未接线」。
  *
  * 合并**不是后者覆盖前者**：以最高优先层为骨架，低优先层只做字段校验与补全 ——
  * 出现率 ≥10% 而骨架没有的字段追加为可选并标「整合包实测字段」；骨架有而样本里
@@ -48,21 +51,6 @@ export function putLayer(layer: SchemaLayer, schema: RecipeTypeSchema): void {
 
 export function putMany(layer: SchemaLayer, schemas: readonly RecipeTypeSchema[]): void {
   for (const s of schemas) putLayer(layer, s)
-}
-
-/** 直接写入生效表（插件热更新、L3 手填结果等）。 */
-export function upsert(schema: RecipeTypeSchema): void {
-  effective.set(schema.id, schema)
-  const layer = layerFor(schema.source)
-  if (layer) layerMaps.get(layer)?.set(schema.id, schema)
-}
-
-function layerFor(source: SchemaSource): SchemaLayer | null {
-  if (source === 'plugin') return 'plugin'
-  if (source === 'builtin') return 'builtin'
-  if (source === 'probejs') return 'jar'
-  if (source === 'inferred') return 'inferred'
-  return null
 }
 
 export function getSchema(typeId: string): RecipeTypeSchema | null {
