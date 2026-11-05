@@ -226,3 +226,51 @@ describe('RV1-007：extraFields 同名字段去重', () => {
     expect((merged.extraFields ?? []).map((s) => s.key)).toEqual(['legacy'])
   })
 })
+
+describe('D-49.2 契约守卫：插件骨架 × L1 按阈值叠加（overlay 删除后的唯一防线）', () => {
+  beforeEach(() => {
+    clearSchemas()
+  })
+
+  it('插件骨架走 augment：≥10% 骨架外字段进 slots，<10% 不进，插件原有叫法不被覆盖', () => {
+    putLayer(
+      'plugin',
+      schema('demo:plugin-l1', 'plugin', {
+        displayName: '插件骨架',
+        slots: [slot('energy', 'input', { displayName: '能量', required: true })]
+      })
+    )
+    putLayer(
+      'inferred',
+      schema('demo:plugin-l1', 'inferred', {
+        sampleCount: 5,
+        slots: [
+          slot('energy', 'input', { displayName: 'Energy', occurrenceRate: 1 }), // 骨架已有 → 不追加
+          slot('duration', 'input', { displayName: '时长', occurrenceRate: 0.3 }), // ≥0.1 → 提升进 slots
+          slot('rare', 'input', { displayName: '罕见', occurrenceRate: 0.05 }) // <0.1 → 丢弃
+        ]
+      })
+    )
+
+    applyMerge({})
+    const got = getSchema('demo:plugin-l1')!
+    const keys = got.slots.map((s) => s.key)
+
+    // ① 叠加契约：L1 高频字段被提升进 slots（这正是 overlay 想测、由 augment 真正兑现的行为）
+    expect(keys).toEqual(['energy', 'duration'])
+    // ② 插件权威：骨架原有字段保留插件的 displayName，不被 inferred 的 'Energy' 覆盖
+    expect(got.slots.find((s) => s.key === 'energy')?.displayName).toBe('能量')
+    // ③ 提升语义：required:false + 来源说明，不是悄悄混进必填区
+    const duration = got.slots.find((s) => s.key === 'duration')!
+    expect(duration.required).toBe(false)
+    expect(duration.description).toBe('整合包实测字段（出现率 30%，骨架未声明）')
+    // ④ 阈值下限：低于 10% 的新字段不得出现（否则罕见字段会污染主表单）
+    expect(keys).not.toContain('rare')
+    expect((got.extraFields ?? []).map((s) => s.key)).not.toContain('rare')
+    // ⑤ 来源与样本：合并结果仍是插件骨架（不是 inferred），但样本统计取 L1 实测
+    expect(got.source).toBe('plugin')
+    expect(got.sampleCount).toBe(5)
+    // ⑥ 无重复 key（BH-006 同族风险在插件路径上同样成立）
+    expect(duplicateKeys(got)).toEqual([])
+  })
+})
