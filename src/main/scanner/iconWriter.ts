@@ -9,9 +9,10 @@
  * 1. **去重**：同一目标路径在一次扫描里只写一次；并发重复提交共享同一个 Promise；
  * 2. **限流**：全进程共享一个并发上限，避免 8 个 worker 各自乱写把磁盘打满；
  * 3. **错误/取消传播**：写入失败按任务 reject（调用方据此让该 jar 失败），
- *    取消后不再写入排队任务，已开始的写入任其完成（不产生临时文件）。
+ *    取消后不再写入排队任务，已开始的写入任其完成。
  *
- * `wx` 语义：直接尝试独占创建，`EEXIST` 视为「已存在、跳过」，从而省掉每张图标的 `existsSync`。
+ * 落盘语义（B121/D-2）：写前 stat 保住「已存在即跳过」；新写入走 tmp + rename 原子替换，
+ * 进程中途被杀不会留下被内容寻址永久占位的截断 PNG（残留 tmp 由 cache:clear 的 temp 类清扫）。
  */
 import { promises as fsp } from 'node:fs'
 import { recordIcon } from './scanSession'
@@ -130,21 +131,37 @@ class IconWriter {
       return
     }
     try {
-      // `wx`：独占创建。文件已存在 → EEXIST → 等价于原实现的 existsSync 分支（跳过）
-      await fsp.writeFile(job.target, job.bytes, { flag: 'wx' })
-      this.counters.written += 1
-      this.known.add(job.target)
-      this.inflight.delete(job.target)
-      job.resolve(true)
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code
-      if (code === 'EEXIST') {
+      // B121/D-2：先 stat 保住「已存在即跳过」语义（P-OPT2 的 fast path），
+      // 再用 tmp+rename 原子落盘——原先直接 wx 写最终路径，进程在写途中被杀会留下
+      // 截断 PNG，且内容寻址 + EEXIST 跳过让它永远不会被修复。
+      try {
+        await fsp.stat(job.target)
         this.counters.skipped += 1
         this.known.add(job.target)
         this.inflight.delete(job.target)
         job.resolve(false)
         return
+      } catch {
+        /* 不存在 → 继续写入 */
       }
+      const tmp = `${job.target}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`
+      let handle: Awaited<ReturnType<typeof fsp.open>> | null = null
+      try {
+        handle = await fsp.open(tmp, 'wx')
+        await handle.writeFile(job.bytes)
+        await handle.close()
+        handle = null
+        await fsp.rename(tmp, job.target)
+      } catch (err) {
+        if (handle) await handle.close().catch(() => undefined)
+        await fsp.rm(tmp, { force: true }).catch(() => undefined)
+        throw err
+      }
+      this.counters.written += 1
+      this.known.add(job.target)
+      this.inflight.delete(job.target)
+      job.resolve(true)
+    } catch (err) {
       // 失败路径不记入 known，允许后续重试（与原「每张独立尝试」的语义一致）
       this.counters.failed += 1
       this.inflight.delete(job.target)

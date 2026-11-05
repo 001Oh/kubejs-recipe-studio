@@ -16,7 +16,8 @@ import { getMainWindow } from './window'
 import { beginTask, cancelTask, endTask } from './scanControl'
 import { getCurrentModpack, setCurrentSummary } from './modpack/state'
 import { buildCacheMeta, scanItems, type ItemScanResult } from './scanner/scanService'
-import { setItemIndex } from './scanner/itemIndex'
+import { getItemById, itemCount, setItemIndex } from './scanner/itemIndex'
+import { setGenerationContext } from './codegen/context'
 import { endScanSession, startScanSession } from './scanner/scanSession'
 import { isCacheValid, saveCacheMeta } from './cache'
 import { cacheFile } from './paths'
@@ -28,10 +29,32 @@ import { enrichIndex, REFERENCED_LIMIT, VANILLA_LIST_VERSION, type EnrichReport 
 
 export const SCAN_TASK_ID = 'items-scan'
 
+// B121/N-2：生成上下文的唯一生产接线点。此前 setGenerationContext 只有测试调用，
+// semanticContext 恒为空 → validateSemantics 的「未知物品」警告（规格行为）永不触发。
+// 索引为空（未导入/未扫完）时按「事实不可知」降级为 true，避免预览误报全量未知。
+setGenerationContext({
+  semantic: {
+    itemExists: (id) => (itemCount() > 0 ? getItemById(id) !== null : true)
+  }
+})
+
 let running = false
 
 export function isScanning(): boolean {
   return running
+}
+
+/**
+ * B121/D-5：扫描运行中拒绝其它「以当前包为前提」的写入型操作（导入整合包 / 注册表导入）。
+ * 统一文案与口径（对齐 cache:clear 的 SCAN_IN_PROGRESS），拒绝而非排队——
+ * 排队会让用户在不知情时改变当前包，运行中的扫描收尾仍会把旧包数据灌进新会话。
+ */
+export function assertScanIdle(actionLabel: string): void {
+  if (!running) return
+  const err = new Error(`扫描进行中，请等扫描完成或先取消扫描，再${actionLabel}`) as Error & { code: string }
+  err.name = 'SCAN_IN_PROGRESS'
+  err.code = 'SCAN_IN_PROGRESS'
+  throw err
 }
 
 function emitProgress(progress: ScanProgress): void {
@@ -133,7 +156,18 @@ export async function startScan(rebuild: boolean, deps: ScanDeps = {}): Promise<
       extras: items.extras
     })
     if (!rebuild && fullCache.valid) {
-      recipeCacheHit = await loadRecipes()
+      // B121/D-3：loadFromCache 内部抛错（畸形缓存触发的意外异常）也必须走「重扫」降级，
+      // 而不是击穿成 scan-failed——返回 false 与抛异常在这里等价处理。
+      try {
+        recipeCacheHit = await loadRecipes()
+      } catch (err) {
+        logger.warn(
+          'INDEX',
+          '配方缓存恢复异常，改为重新扫描配方',
+          err instanceof Error ? err.message : String(err)
+        )
+        recipeCacheHit = false
+      }
       if (recipeCacheHit) logger.info('INDEX', `命中配方缓存：${fullCache.reason}`)
       else logger.warn('INDEX', '配方缓存文件读取失败，改为重新扫描配方')
     }

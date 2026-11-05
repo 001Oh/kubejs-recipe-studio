@@ -151,7 +151,7 @@ export function stats(): RecipeStats | null {
   }
 }
 
-interface PersistedRecipes {
+export interface PersistedRecipes {
   builtAtMs: number
   elapsedMs: number
   types: string[]
@@ -172,15 +172,40 @@ export async function persist(): Promise<boolean> {
   return true
 }
 
+/**
+ * B121/D-3：recipes.json 内容形状校验（对齐 scanService.parseItemsCacheJson 的口径）：
+ * 数组内任一元素不满足 RecipeRecord 最小形态即整体判废（调用方重扫）。
+ * 此前零校验，`records:[{}]` 会在 buildIndex 里抛 TypeError，且先清后建的倒排表半残。
+ */
+export function parseRecipesCacheJson(data: PersistedRecipes): RecipeRecord[] | null {
+  if (!data || !Array.isArray(data.records)) return null
+  const list = data.records as unknown[]
+  const allValid = list.every((rec) => {
+    if (!rec || typeof rec !== 'object' || Array.isArray(rec)) return false
+    const r = rec as Record<string, unknown>
+    return (
+      typeof r['uid'] === 'string' &&
+      (r['uid'] as string).length > 0 &&
+      typeof r['recipeId'] === 'string' &&
+      typeof r['type'] === 'string' &&
+      typeof r['sourcePath'] === 'string' &&
+      Array.isArray(r['outputs']) &&
+      Array.isArray(r['inputs'])
+    )
+  })
+  return allValid ? (list as RecipeRecord[]) : null
+}
+
 export async function loadFromCache(): Promise<boolean> {
   const modpack = getCurrentModpack()
   if (!modpack) return false
   const data = await readJson<PersistedRecipes>(cacheFile(modpack.path, 'recipes'))
-  if (!data || !Array.isArray(data.records)) return false
-  buildIndex(data.records)
-  statsElapsedMs = typeof data.elapsedMs === 'number' ? data.elapsedMs : statsElapsedMs
-  addKnownTypes(data.types ?? [])
-  logger.info('INDEX', `配方缓存命中：${data.records.length} 条`)
+  const records = data ? parseRecipesCacheJson(data) : null
+  if (!records) return false
+  buildIndex(records)
+  statsElapsedMs = typeof data?.elapsedMs === 'number' ? data.elapsedMs : statsElapsedMs
+  addKnownTypes(data?.types ?? [])
+  logger.info('INDEX', `配方缓存命中：${records.length} 条`)
   return true
 }
 

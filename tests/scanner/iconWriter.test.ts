@@ -64,6 +64,13 @@ describe('P-OPT2 图标写入队列', () => {
     expect(iconWriterStats().failed).toBe(1)
   })
 
+  it('写入成功后目录无 .tmp 残留（B121/D-2：tmp+rename 原子落盘）', async () => {
+    const names = Array.from({ length: 5 }, (_, i) => join(DIR, `atomic-${i}.png`))
+    await Promise.all(names.map((n) => writeIcon(n, PNG)))
+    const left = (await fsp.readdir(DIR)).filter((n) => n.endsWith('.tmp'))
+    expect(left).toEqual([])
+  })
+
   it('取消后不再写入排队任务', async () => {
     const controller = new AbortController()
     controller.abort()

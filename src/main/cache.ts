@@ -96,7 +96,19 @@ function basenameOf(path: string): string {
   return idx === -1 ? normalized : normalized.slice(idx + 1)
 }
 
-async function walk(dir: string, onFile: (size: number, mtimeMs: number) => void): Promise<void> {
+/**
+ * B121/D-1：与 jsonSource.walkDir / scriptSource.findScripts / cacheHandlers.walk 同一条防护
+ * 口径——lstat 不跟随符号链接/junction、递归深度有上限。此前的 stat 跟随 + 无限递归是
+ * 全仓防护链的最后一块漏板：kubejs/data、datapacks 里的环状 junction 会让每次启动的
+ * extras 签名计算（缓存命中也要执行）挂死或抛错。
+ */
+const MAX_WALK_DEPTH = 32
+
+async function walk(dir: string, onFile: (size: number, mtimeMs: number) => void, depth = 0): Promise<void> {
+  if (depth > MAX_WALK_DEPTH) {
+    logger.warn('INDEX', `目录层级超过 ${MAX_WALK_DEPTH} 层，已跳过该分支：${dir}`, '可能是异常目录树或链接成环')
+    return
+  }
   let names: string[]
   try {
     names = await fsp.readdir(dir)
@@ -106,8 +118,10 @@ async function walk(dir: string, onFile: (size: number, mtimeMs: number) => void
   for (const name of names) {
     const abs = join(dir, name)
     try {
-      const st = await fsp.stat(abs)
-      if (st.isDirectory()) await walk(abs, onFile)
+      // lstat 不解析链接：链接本身不统计也不深入（与扫描端语义一致，防止环与越界）
+      const st = await fsp.lstat(abs)
+      if (st.isSymbolicLink()) continue
+      if (st.isDirectory()) await walk(abs, onFile, depth + 1)
       else if (st.isFile()) onFile(st.size, st.mtimeMs)
     } catch {
       /* 单个文件读不到不影响签名聚合 */

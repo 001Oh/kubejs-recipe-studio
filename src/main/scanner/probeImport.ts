@@ -28,15 +28,17 @@ export interface RegistryScan {
   fluidIds: Set<string>
 }
 
+/** B121/D-4：与 ID_SHAPE 同形的带捕获组版本；exec 迭代单遍扫描，不再逐匹配 indexOf 全文回扫 */
+const QUOTED_ID = /"([a-z0-9_.-]+:[a-z0-9_./-]+)"/g
+
 function collectIdsFromText(text: string, into: { item: Set<string>; fluid: Set<string> }): void {
-  // d.ts / json 里的字符串字面量
-  const quoted = text.match(/"[a-z0-9_.-]+:[a-z0-9_./-]+"/g) ?? []
-  for (const raw of quoted) {
-    const id = raw.slice(1, -1)
-    const at = text.indexOf(raw)
+  // d.ts / json 里的字符串字面量——单遍 exec，O(L)；旧实现对每个匹配做一次全文 indexOf（O(M×L)）
+  QUOTED_ID.lastIndex = 0
+  for (let m = QUOTED_ID.exec(text); m; m = QUOTED_ID.exec(text)) {
+    const at = m.index
     const context = text.slice(Math.max(0, at - 240), at)
-    if (FLUID_HINT.test(context)) into.fluid.add(id)
-    else into.item.add(id)
+    if (FLUID_HINT.test(context)) into.fluid.add(m[1] as string)
+    else into.item.add(m[1] as string)
   }
 }
 
