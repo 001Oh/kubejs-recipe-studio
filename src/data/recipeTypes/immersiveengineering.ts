@@ -4,7 +4,7 @@
  * **没有 energy、没有 time、没有概率 secondaries**，因此这三个字段必须
  * `sugarSupported:false` —— 这是自动降级的唯一依据，写错就等于骗用户。
  */
-import { emit, extra, input, noSugar, output, raw, s, shape, type RawSchema } from './_helper'
+import { emit, extra, input, noSugar, output, raw, shape, type RawSchema } from './_helper'
 
 const NS = 'immersiveengineering'
 const mod = 'Immersive Engineering'
@@ -132,14 +132,7 @@ export const immersiveengineeringSchemas: RawSchema[] = [
     fieldsVerified: false,
     slots: [shape('inputs')],
     outputs: []
-  }),
-  raw(`${NS}:assembler`, NS, {
-    modDisplayName: mod,
-    layout: 'custom',
-    emit: emit(NS, 'assembler'),
-    fieldsVerified: false,
-    note: '装配头的 pattern 与 upgrades 结构复杂（含 NBT），未验证字段一律交给 L1 / 手写 JSON',
-    slots: [s('pattern', 'struct', { multiple: true, description: '装配头模板：结构复杂时降级 JSON 编辑器' })],
-    outputs: []
   })
+  // B120/D-35：`immersiveengineering:assembler` 已删除——IERecipeTypes（1.21.1）21 个注册名无 assembler。
+  // 装配机是多方块机器，直接消费 crafting 类配方，没有自己的 recipe serializer。
 ]

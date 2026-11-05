@@ -32,7 +32,9 @@ export const createSchemas: RawSchema[] = [
   processing('cutting', { time: true }),
   processing('pressing'),
   processing('milling', { time: true }),
-  processing('sawing', { time: true }),
+  // B120/D-35：`create:sawing` 与 `create:draining` 已删除——AllRecipeTypes 枚举（1.21.1 全常量）
+  // 无 SAWING / DRAINING，模组从未注册这两个 id。锯切类真名是 create:cutting（上方已声明，
+  // 原声明疑与 mekanism:sawing 混淆）；排液类真名是 create:emptying（下方已声明）。
   processing('haunting'),
   processing('splashing'),
   raw(`${NS}:filling`, NS, {
@@ -52,15 +54,6 @@ export const createSchemas: RawSchema[] = [
     outputs: [output('result', 'item', { required: true }), output('fluid_stack', 'fluid')],
     fieldsVerified: false,
     note: '与 filling 互逆；流体侧字段名以本包样本为准'
-  }),
-  raw(`${NS}:draining`, NS, {
-    modDisplayName: mod,
-    layout: 'single_io',
-    emit: emit(NS, 'draining'),
-    slots: [shape('ingredients')],
-    outputs: [output('results', 'item', { multiple: true }), output('fluid_output', 'fluid')],
-    fieldsVerified: false,
-    note: '排空容器的流体侧字段名以本包样本为准'
   }),
   raw(`${NS}:mechanical_crafting`, NS, {
     modDisplayName: mod,

@@ -72,12 +72,14 @@ export const botaniaSchemas: RawSchema[] = [
     extra: [extra('time', 'number', { min: 0 })],
     notes: ['世界交互型：input2 可缺省，水 / 相邻方块属于摆放要求而非材料']
   }),
-  raw('botania:brewery', 'botania', {
+  // B120/D-35：botania:brewery → botania:brew（方块叫 Brewery，配方类型 id 是 brew；
+  // BotaniaRecipeTypes 的 BREW_TYPE 对应 BotanicalBreweryRecipe，注册 id = brew，三口径样本均为 brew）
+  raw('botania:brew', 'botania', {
     modDisplayName: 'Botania',
     layout: 'multi_io',
     emit: null,
     fieldsVerified: false,
-    note: '酿造台需要试剂 + 蒸馏瓶，键名以本包样本为准',
+    note: '酿造池配方 id 是 botania:brew（非 brewery）；ingredients 是材料数组，输出是 brew 液体引用，键名以本包样本为准',
     slots: [shape('ingredients')],
     outputs: []
   })
@@ -120,17 +122,9 @@ export const arsNouveauSchemas: RawSchema[] = [
     note: 'glyph 配方的交互条件（层级 / 星界亲和）属 requirements；字段交给 L1',
     slots: [],
     outputs: []
-  }),
-  raw('ars_nouveau:sourcelink', 'ars_nouveau', {
-    modDisplayName: 'Ars Nouveau',
-    layout: 'multi_io',
-    emit: null,
-    fieldsVerified: false,
-    note: '源质链接的充能材料与维度条件由 L1 反推',
-    requirements: [{ kind: 'dimension', text: '部分glyph仅在特定维度可用' }],
-    slots: [],
-    outputs: []
   })
+  // B120/D-35：`ars_nouveau:sourcelink` 已删除——RecipeRegistry（1.19.2 与 1.21.1）13 个注册名
+  // 均无 sourcelink。魔源链接是方块实时充能，不发布数据包配方，从来不是配方类型。
 ]
 
 export const pneumaticcraftSchemas: RawSchema[] = [
@@ -144,17 +138,49 @@ export const pneumaticcraftSchemas: RawSchema[] = [
     fieldsVerified: false,
     note: '压力 + 温度是原语 5（struct）里的两个标量，具体键名以本包样本为准'
   }),
-  raw('pneumaticcraft:assembly', 'pneumaticcraft', {
+  // B120/D-35：`pneumaticcraft:assembly` 拆成两条。
+  // ModRecipeSerializers（1.19.2 与 1.21.1）均无 `assembly`；实际注册的是 assembly_drill / assembly_laser。
+  // 1.19.2 另有 assembly_drill_laser（钻+激光合体头）——本包 0 样本，不单独立条目，交给 L1。
+  raw('pneumaticcraft:assembly_drill', 'pneumaticcraft', {
     modDisplayName: 'PneumaticCraft: Repressurized',
-    layout: 'sequence',
-    emit: emit('pneumaticcraft', 'assembly'),
+    layout: 'single_io',
+    emit: emit('pneumaticcraft', 'assembly_drill'),
+    slots: [input('input', 'item', { required: true, description: '待加工物品' })],
+    outputs: [output('result', 'item', { required: true })],
+    extra: [noSugar(extra('program', 'choice', { label: '程序（drill / laser）' }))],
     fieldsVerified: false,
-    note: '装配机是「一组工序」型（钻 / 拧 / 涂胶），工序列表结构交给 L1 反推',
-    slots: [s('assembly_ingredients', 'item', { multiple: true, zone: 'input' })],
-    outputs: []
+    note: '真实样本字段：input / program / result；program=drill 时用钻头，激光同构'
   }),
-  raw('pneumaticcraft:explosion', 'pneumaticcraft', { modDisplayName: 'PneumaticCraft', layout: 'multi_io', emit: null, fieldsVerified: false, slots: [], outputs: [] }),
+  raw('pneumaticcraft:assembly_laser', 'pneumaticcraft', {
+    modDisplayName: 'PneumaticCraft: Repressurized',
+    layout: 'single_io',
+    emit: emit('pneumaticcraft', 'assembly_laser'),
+    slots: [input('input', 'item', { required: true, description: '待加工物品（可为 stacked_item 带 count）' })],
+    outputs: [output('result', 'item', { required: true })],
+    extra: [noSugar(extra('program', 'choice', { label: '程序（drill / laser）' }))],
+    fieldsVerified: false,
+    note: '真实样本字段：input / program / result；input 支持 pneumaticcraft:stacked_item 带 count'
+  }),
+  raw('pneumaticcraft:explosion_crafting', 'pneumaticcraft', {
+    modDisplayName: 'PneumaticCraft: Repressurized',
+    layout: 'multi_io',
+    emit: null,
+    fieldsVerified: false,
+    slots: [input('input', 'item', { required: true }), shape('results')],
+    outputs: [output('results', 'item', { multiple: true, required: true })],
+    extra: [noSugar(extra('loss_rate', 'number', { min: 0, label: '损耗率' }))],
+    note: '注册名带 _crafting 后缀（explosion 不是有效 id）；真实样本字段：input / loss_rate / results'
+  }),
   raw('pneumaticcraft:refinery', 'pneumaticcraft', { modDisplayName: 'PneumaticCraft', layout: 'multi_io', emit: null, fieldsVerified: false, slots: [], outputs: [] }),
-  raw('pneumaticcraft:thermopneumatic', 'pneumaticcraft', { modDisplayName: 'PneumaticCraft', layout: 'single_io', emit: null, fieldsVerified: false, slots: [], outputs: [] })
+  raw('pneumaticcraft:thermo_plant', 'pneumaticcraft', {
+    modDisplayName: 'PneumaticCraft: Repressurized',
+    layout: 'multi_io',
+    emit: null,
+    fieldsVerified: false,
+    slots: [input('item_input', 'item'), input('fluid_input', 'fluid')],
+    outputs: [output('item_output', 'item'), output('fluid_output', 'fluid')],
+    extra: [noSugar(extra('temperature', 'struct', { label: '温度区间' })), noSugar(extra('exothermic', 'boolean', { label: '放热' }))],
+    note: '注册名是 thermo_plant（thermopneumatic 不存在）；真实样本字段：exothermic / fluid_input / item_input / item_output / temperature'
+  })
 ]
 

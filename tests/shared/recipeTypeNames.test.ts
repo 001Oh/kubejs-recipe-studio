@@ -55,6 +55,9 @@ describe('recipeTypeNameZh：配方类型中文名三级解析', () => {
   // mana_infusion 渲染成中英混排「mana 灌注」（词表只命中 infusion，mana 未命中）。
   // 这条用例把 L0 库里全部类型钉成「不许出现拉丁字母开头的纯英文名」。
   it('L0 库全部类型：不传 fallback 必须渲染成中文（禁止英文/中英混排）', () => {
+    // B120/D-35：8 条错 id 已修（brewery→brew、删 sourcelink/assembler/draining/sawing、
+    // assembly→drill+laser、explosion→explosion_crafting、thermopneumatic→thermo_plant），
+    // 本清单同步换成修正后的真实 id。
     const L0_IDS = [
       // 植物魔法
       'botania:petal_apothecary',
@@ -63,19 +66,19 @@ describe('recipeTypeNameZh：配方类型中文名三级解析', () => {
       'botania:mana_infusion',
       'botania:elven_trade',
       'botania:pure_daisy',
-      'botania:brewery',
+      'botania:brew',
       // 新生魔艺
       'ars_nouveau:enchanting_apparatus',
       'ars_nouveau:imbuement',
       'ars_nouveau:crush',
       'ars_nouveau:glyph',
-      'ars_nouveau:sourcelink',
       // 气动工艺
       'pneumaticcraft:pressure_chamber',
-      'pneumaticcraft:assembly',
-      'pneumaticcraft:explosion',
+      'pneumaticcraft:assembly_drill',
+      'pneumaticcraft:assembly_laser',
+      'pneumaticcraft:explosion_crafting',
       'pneumaticcraft:refinery',
-      'pneumaticcraft:thermopneumatic',
+      'pneumaticcraft:thermo_plant',
       // 沉浸工程
       'immersiveengineering:arc_furnace',
       'immersiveengineering:blast_furnace',
@@ -88,7 +91,6 @@ describe('recipeTypeNameZh：配方类型中文名三级解析', () => {
       'immersiveengineering:squeezer',
       'immersiveengineering:refinery',
       'immersiveengineering:mixer',
-      'immersiveengineering:assembler',
       // 热力
       'thermal:insolator',
       'thermal:bottler',

@@ -53,10 +53,20 @@ describe('B120/D-06：ars/pnc 接线 + thermal jar 实名别名 + D-28 钉测', 
     expect(ids).toContain('thermal:smelter')
   })
 
-  it('ars_nouveau 5 条 + pneumaticcraft 5 条按 modId 激活', () => {
+  it('ars_nouveau 4 条 + pneumaticcraft 6 条按 modId 激活（B120/D-35 修错 id 后的真实条数）', () => {
     const ids = activeL0Schemas(PACK).map((s) => s.id)
-    expect(ids.filter((i) => i.startsWith('ars_nouveau:')).length).toBe(5)
-    expect(ids.filter((i) => i.startsWith('pneumaticcraft:')).length).toBe(5)
+    // ars 原 5 条：删掉 sourcelink（RecipeRegistry 无此注册名）→ 4
+    expect(ids.filter((i) => i.startsWith('ars_nouveau:')).length).toBe(4)
+    expect(ids).not.toContain('ars_nouveau:sourcelink')
+    // pnc 原 5 条：assembly 拆成 assembly_drill + assembly_laser（+1）、explosion→explosion_crafting、
+    // thermopneumatic→thermo_plant（改名不增减）→ 6
+    expect(ids.filter((i) => i.startsWith('pneumaticcraft:')).length).toBe(6)
+    for (const id of ['pneumaticcraft:assembly_drill', 'pneumaticcraft:assembly_laser', 'pneumaticcraft:explosion_crafting', 'pneumaticcraft:thermo_plant']) {
+      expect(ids, id).toContain(id)
+    }
+    for (const id of ['pneumaticcraft:assembly', 'pneumaticcraft:explosion', 'pneumaticcraft:thermopneumatic']) {
+      expect(ids, id).not.toContain(id)
+    }
   })
 
   it('installedModIds 仅含 thermal_foundation 时 thermal 全量激活（实测 13 条，台账写 3 条系口径误差）', () => {
