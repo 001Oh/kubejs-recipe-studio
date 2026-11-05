@@ -3,7 +3,7 @@ import type { ImportCandidates, ImportResult } from '../../shared/ipc'
 import { importModpack } from '../modpack'
 import { getCurrentModpack, getCurrentSummary, readFavorites, setCurrentModpack, setCurrentSummary } from '../modpack/state'
 import { registerHandler } from '../ipcRegistry'
-import { cancelScan, isScanning } from '../scanOrchestrator'
+import { cancelScan, assertScanIdle, isScanning } from '../scanOrchestrator'
 import { setItemIndex } from '../scanner/itemIndex'
 import { buildIndex } from '../recipes/recipeIndex'
 import { resetPluginLoader } from '../plugins/loader'
@@ -15,6 +15,10 @@ import { logger } from '../logger'
 
 export function registerModpackHandlers(): void {
   registerHandler('modpack:import', async (req): Promise<ImportResult | ImportCandidates> => {
+    // B121/D-5：扫描运行中导入会把运行中编排器持有的旧包索引/摘要在收尾灌进新包会话
+    //（scanOrchestrator 收尾的 setItemIndex/setCurrentSummary）。此处拒绝而非静默排队，
+    // 用户取消扫描后即可导入（与 cache:clear 的 SCAN_IN_PROGRESS 同一口径）。
+    assertScanIdle('导入整合包')
     const path = typeof req?.path === 'string' ? req.path.trim() : ''
     if (!path) {
       const error = '未选择目录，请先选择整合包根目录'

@@ -4,6 +4,7 @@
  */
 import { registerHandler } from '../ipcRegistry'
 import { ensureSchemas } from '../schema/service'
+import { isScanning } from '../scanOrchestrator'
 import { logger } from '../logger'
 import { lookup, queryByInput, queryByOutput, stats } from '../recipes/recipeIndex'
 import { readFullRecipe } from '../recipes/lazy'
@@ -48,6 +49,12 @@ export function registerRecipeHandlers(): void {
     // REM-01：同上，提交也要按当前包的 schema 归一化
     await ensureSchemas()
     const result = await commitRecipe(req)
+    // B121/D-5：提交本身不阻塞（文件写盘+回读校验独立安全），但扫描收尾的 buildIndex 会
+    // 覆盖本次的内存索引更新——把这一事实显式带回 UI，而不是让「提交成功」静默失效。
+    if (isScanning() && !result.indexWarning) {
+      result.indexWarning = '扫描进行中：扫描收尾可能覆盖本次提交的索引更新，扫描完成后请重新扫描以刷新索引'
+      logger.warn('RECIPE', '提交成功，但当前有扫描在运行——索引更新可能被扫描结果覆盖')
+    }
     logger.success(
       'RECIPE',
       `提交配方 ${req.uid} → ${result.savedRelativePath}（${result.mode === 'copy' ? '另存副本' : '覆盖'}，字段 ${result.dirtyFields.join('、')}）`

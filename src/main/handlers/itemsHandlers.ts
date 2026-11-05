@@ -9,6 +9,7 @@ import { runProbeImport } from '../scanner/probeImport'
 import { scannedOnly } from '../vanillaItems'
 import { writeJson } from '../cache'
 import { cacheFile } from '../paths'
+import { assertScanIdle } from '../scanOrchestrator'
 import { logger } from '../logger'
 import type { ItemsQueryResult } from '../../shared/ipc'
 
@@ -28,6 +29,8 @@ export function registerItemsHandlers(): void {
   registerHandler('favorites:set', ({ id, on }) => setFavorite(id, on))
 
   registerHandler('probe:import', async ({ paths }) => {
+    // B121/D-5：扫描中导入会与扫描收尾互相覆盖内存索引与 items.json（verified 标记静默丢失）
+    assertScanIdle('导入注册表导出')
     const modpack = getCurrentModpack()
     if (!modpack) throw new Error('尚未导入整合包')
     const before = getItems()
