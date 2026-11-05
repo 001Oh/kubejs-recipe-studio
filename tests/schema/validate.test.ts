@@ -107,7 +107,8 @@ describe('校验器：只依赖规范化数据 + Schema', () => {
 })
 
 describe('架构约束：校验器与规范化不依赖 Electron/扫描器/界面', () => {
-  const files = ['schemaModel.ts', 'normalize.ts', 'schemaValidate.ts', 'unknownFields.ts', 'draftState.ts', 'schemaMigrate.ts']
+  // B121/D-49：schemaMigrate.ts 已删除（四处 userData 无历史钉住数据，现行落盘格式即裸数组）
+  const files = ['schemaModel.ts', 'normalize.ts', 'schemaValidate.ts', 'unknownFields.ts', 'draftState.ts']
   for (const file of files) {
     it(`${file} 不带进程耦合依赖`, () => {
       const source = readFileSync(join(process.cwd(), 'src', 'shared', file), 'utf8')
