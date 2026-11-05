@@ -22,7 +22,8 @@ vi.mock('electron', () => ({
 
 // T-117：create:mixing 已从内置移除（Create 系等 KJS 加载机制批次），
 // 「能力随包内容变化」的样本改用 L0 层的 thermal:pulverizer——
-// 包里装了 thermal → L0 激活 → compatible；没装 → 该类型不在注册表 → loadSchema 返回 null。
+// 包里装了 thermal + kubejs_thermal → L0 激活 + emit 透传 → sugar（B121/S-2）；
+// 没装 thermal → 该类型不在注册表 → loadSchema 返回 null。
 const L0_TYPE = 'thermal:pulverizer'
 
 function modpack(path: string, addons: string[], installedMods: string[] = ['minecraft', 'kubejs']): ModpackInfo {
@@ -63,15 +64,15 @@ describe('REM-01：换包后 schema 立即跟随当前包', () => {
     vi.resetModules()
   })
 
-  it('基线：packA 装了 thermal → L0 的 thermal:pulverizer 判为可结构化（compatible）', async () => {
+  it('基线：packA 装了 thermal + kubejs_thermal → L0 的 thermal:pulverizer 判为语法糖可用（B121/S-2：emit 已透传）', async () => {
     const { preview } = await boot()
     const schema = await preview.loadSchema(L0_TYPE)
-    expect(schema?.capability).toBe('compatible')
+    expect(schema?.capability).toBe('sugar')
   })
 
   it('切到未装 thermal 的 packB：不手动刷新，loadSchema 立刻拿不到该类型（L0 按包内容激活）', async () => {
     const { state, preview } = await boot()
-    expect((await preview.loadSchema(L0_TYPE))?.capability).toBe('compatible')
+    expect((await preview.loadSchema(L0_TYPE))?.capability).toBe('sugar')
 
     // 换包：只切 modpack（模拟 modpack:import 成功后的状态迁移），不调任何 schema IPC
     state.setCurrentModpack(modpack('C:/packs/packB', [], ['minecraft', 'kubejs']))
@@ -94,7 +95,10 @@ describe('REM-01：换包后 schema 立即跟随当前包', () => {
     const packed = modpack('C:/packs/packA', ['kubejs_thermal'], ['minecraft', 'kubejs', 'thermal'])
 
     const before = await preview.generate({ workbench, modpack: packed, hasSamples: true, createdAtMs: 1 })
-    expect(before.preview.channel).toBe('datapack-json')
+    // B121/S-2：secondaries/energy/time 声明了 sugarSupported:false，而通用 outputs 会把值
+    // 填进 secondaries → 语法糖无法表达已填字段 → 按规格降级 event.custom（保留全部参数）。
+    // 修复前 emitTarget 丢失、sugarSupported 蒸发，误判为 datapack-json。
+    expect(before.preview.channel).toBe('event-custom')
     expect(before.preview.typeId).toBe(L0_TYPE)
 
     state.setCurrentModpack(modpack('C:/packs/packB', [], ['minecraft', 'kubejs']))
@@ -110,7 +114,7 @@ describe('REM-01：换包后 schema 立即跟随当前包', () => {
 
   it('同路径但附属集合变化（重新检测）也要重建，而不是沿用旧判定', async () => {
     const { state, preview } = await boot()
-    expect((await preview.loadSchema(L0_TYPE))?.capability).toBe('compatible')
+    expect((await preview.loadSchema(L0_TYPE))?.capability).toBe('sugar')
 
     // 路径不变，只改模组清单（模拟重新检测到不同模组集合）
     state.setCurrentModpack(modpack('C:/packs/packA', [], ['minecraft', 'kubejs']))

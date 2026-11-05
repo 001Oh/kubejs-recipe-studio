@@ -35,12 +35,32 @@ function convSlot(init: SlotInit): NormalizedSchemaSlot {
     kind: init.kind,
     multiple: init.multiple === true,
     ...(init.required !== undefined ? { required: init.required } : {}),
-    ...(init.zone !== undefined ? { jsonKey: init.key } : {})
+    ...(init.zone !== undefined ? { jsonKey: init.key, zone: init.zone } : {})
   }
-  // RecipeSlotSchema 与 NormalizedSchemaSlot 同构；zone/role/emit 等可选字段原样透传
-  const extra = init
-  for (const key of ['zone', 'role', 'label', 'docUrl'] as const) {
-    if ((extra as unknown as Record<string, unknown>)[key] !== undefined) (out as unknown as Record<string, unknown>)[key] = (extra as unknown as Record<string, unknown>)[key]
+  // B121/S-2：声明侧语义字段全量透传（此前只带 4 个键，compound/emitShape/sugarSupported/
+  // min/max/choices/registry 等在物化时蒸发，L0「精校」到达编辑器只剩骨架）。
+  // min/max 按 NormalizedSchemaSlot 的 v2 约定收进 constraints。
+  const passthrough = {
+    role: init.role,
+    label: init.label,
+    description: init.description,
+    sugarSupported: init.sugarSupported,
+    choices: init.choices,
+    defaultValue: init.defaultValue,
+    firstItemMust: init.firstItemMust,
+    orientation: init.orientation,
+    registry: init.registry,
+    compound: init.compound,
+    emitShape: init.emitShape
+  } as Partial<NormalizedSchemaSlot>
+  for (const [key, value] of Object.entries(passthrough)) {
+    if (value !== undefined) (out as unknown as Record<string, unknown>)[key] = value
+  }
+  if (init.min !== undefined || init.max !== undefined) {
+    out.constraints = {
+      ...(init.min !== undefined ? { min: init.min } : {}),
+      ...(init.max !== undefined ? { max: init.max } : {})
+    }
   }
   if (init.fields) out['fields'] = init.fields.map(convSlot)
   return out
@@ -51,7 +71,7 @@ export function materializeRaw(raw: RawSchema): NormalizedSchema {
   const slots = (init.slots ?? []).map(convSlot)
   const outputs = (init.outputs ?? []).map(convSlot)
   const extras = (init.extra ?? []).map(convSlot)
-  // extra 字段并进 slots（试点 UI 的「附加区」按 zone 渲染）
+  // extra 字段并进 slots（试点 UI 的「附加区」按 zone 渲染——zone 已随 convSlot 透传）
   return {
     id: raw.id,
     layoutKind: init.layout,
@@ -59,7 +79,16 @@ export function materializeRaw(raw: RawSchema): NormalizedSchema {
     outputs,
     revision: 1,
     preserveUnknown: true,
-    ...(init.supportsChance ? { supportsChance: true } : {})
+    // B121/S-2：schema 级声明透传（emit 是 L0 语法糖目标的唯一来源；此前连同
+    // grid/cells/requirements/notes/modifiers 一并丢失，L0 永远拿不到语法糖与布局预设）
+    ...(init.emit !== undefined ? { emit: init.emit } : {}),
+    ...(init.supportsChance ? { supportsChance: true } : {}),
+    ...(init.modifiers ? { modifiers: init.modifiers } : {}),
+    ...(init.requirements ? { requirements: init.requirements } : {}),
+    ...(init.notes ? { notes: [...init.notes] } : {}),
+    ...(init.grid ? { grid: init.grid } : {}),
+    ...(init.cells ? { cells: init.cells } : {}),
+    ...(init.docUrl ? { docUrl: init.docUrl } : {})
   }
 }
 

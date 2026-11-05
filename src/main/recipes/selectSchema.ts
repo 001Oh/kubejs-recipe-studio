@@ -33,6 +33,24 @@ function slotOf(source: RecipeTypeSchema['slots'][number]): NormalizedSchemaSlot
     ...(source.compound ? { compound: [...source.compound] } : {}),
     jsonKey,
     ...(source.emitShape ? { emitShape: source.emitShape } : {}),
+    // B121/S-2：提交链（Recipe→Normalized）与装配链（Normalized→Recipe）同族透传，
+    // 否则 L0/插件声明的 compound/约束在 commit 的 normalize/denormalize 里再次蒸发
+    ...(source.zone ? { zone: source.zone } : {}),
+    ...(source.role ? { role: source.role } : {}),
+    ...(source.sugarSupported !== undefined ? { sugarSupported: source.sugarSupported } : {}),
+    ...(source.choices ? { choices: source.choices.map((c) => ({ ...c })) } : {}),
+    ...(source.defaultValue !== undefined ? { defaultValue: source.defaultValue } : {}),
+    ...(source.firstItemMust !== undefined ? { firstItemMust: source.firstItemMust } : {}),
+    ...(source.orientation !== undefined ? { orientation: source.orientation } : {}),
+    ...(source.description !== undefined ? { description: source.description } : {}),
+    ...(source.min !== undefined || source.max !== undefined
+      ? {
+          constraints: {
+            ...(source.min !== undefined ? { min: source.min } : {}),
+            ...(source.max !== undefined ? { max: source.max } : {})
+          }
+        }
+      : {}),
     ...(source.fields ? { fields: source.fields.map(slotOf) } : {})
   }
 }

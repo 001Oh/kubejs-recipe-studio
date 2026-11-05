@@ -217,6 +217,20 @@ function convertOne(
             : convertOne(sub, childRaw, `${path}.${key}`, raw, consumed, diagnostics)
       }
       const unknowns = collectUnknownFields(raw, consumedChildren, { pathPrefix: path })
+      // B121/S-1：struct 内部截断此前零诊断、回写骨架/空值损坏配方——value 现保存原始值
+      //（unknownFields 保真），这里把截断事实显式上抛，UI 与 partial 归因可见。
+      for (const unknown of unknowns) {
+        if (unknown.truncatedDepth || unknown.truncatedBytes) {
+          diagnostics?.push({
+            level: 'warn',
+            code: 'UNKNOWN_TRUNCATED',
+            field: slot.key,
+            path: unknown.path,
+            message: `${unknown.path} 的展开超出限制（深度或 8KB），已保留原始数据并将在提交时原样带回`,
+            hint: '原始 JSON 未丢失；需要编辑请直接使用原文'
+          })
+        }
+      }
       return { kind: 'struct', fields, ...(unknowns.length > 0 ? { unknowns } : {}), path }
     }
     const fields: Record<string, NormalizedValue> = {}
@@ -357,7 +371,7 @@ export function normalizeRecipe(input: NormalizeInput): NormalizeResult {
 
   const unknowns = collectUnknownFields(raw, consumed)
   for (const unknown of unknowns) {
-    if (unknown.truncatedDepth || unknown.value === undefined) {
+    if (unknown.truncatedDepth || unknown.truncatedBytes) {
       diagnostics.push({
         level: 'warn',
         code: 'UNKNOWN_TRUNCATED',
@@ -372,7 +386,7 @@ export function normalizeRecipe(input: NormalizeInput): NormalizeResult {
   if (rawType !== schema.id) reasons.push('unmapped-type')
   if (unknowns.length > 0) reasons.push('unclaimed-keys')
   if (unknowns.some((u) => u.reason === 'ambient-condition')) reasons.push('ambient-conditions')
-  if (unknowns.some((u) => u.truncatedDepth || u.value === undefined)) reasons.push('unknowns-truncated')
+  if (unknowns.some((u) => u.truncatedDepth || u.truncatedBytes)) reasons.push('unknowns-truncated')
   if (source.dynamic) reasons.push('dynamic-script')
   if (slots.some((s) => containsUnknown(s.value))) reasons.push('unknown-ref')
 
@@ -474,14 +488,19 @@ function toJsonValue(value: NormalizedValue, slot?: NormalizedSchemaSlot): unkno
       // 字符串形态的标签：必须带回 id，否则「改别的字段」会把 #tag 写成裸 '#'
       return `#${value.id}`
     }
-    case 'fluid':
-      return {
-        ...(value.extras ?? {}),
-        [value.refKey ?? 'fluid']: value.id,
-        ...(value.amount ? { amount: quantityValue(value.amount) } : {}),
-        ...(value.chance ? { chance: quantityValue(value.chance) } : {}),
-        ...(value.nbt !== undefined ? { nbt: value.nbt } : {})
+    case 'fluid': {
+      // B121/S-7：形态保真——裸字符串流体写回裸串；`{fluidStack:{fluid}}` 嵌套写回嵌套，
+      // 绝不因编辑了别的字段就把流体形态悄悄改掉
+      const qty = { ...(value.amount ? { amount: quantityValue(value.amount) } : {}), ...(value.chance ? { chance: quantityValue(value.chance) } : {}), ...(value.nbt !== undefined ? { nbt: value.nbt } : {}) }
+      const hasQty = value.amount !== undefined || value.chance !== undefined || value.nbt !== undefined
+      if (value.refKey === 'fluidStack') {
+        return hasQty || value.extras
+          ? { ...(value.extras ?? {}), fluidStack: { fluid: value.id, ...qty } }
+          : { fluidStack: { fluid: value.id } }
       }
+      if (value.asObject === false && !hasQty && !value.extras) return value.id
+      return { ...(value.extras ?? {}), [value.refKey ?? 'fluid']: value.id, ...qty }
+    }
     case 'registry': {
       if (!value.amount && !value.asObject && !value.extras && slot?.emitShape === 'scalar') return value.id
       const key =

@@ -373,7 +373,8 @@ export async function commitRecipe(req: CommitRecipeRequest, deps: CommitDeps = 
   }
 
   const workbench: WorkbenchState = req.workbench
-  const normalizedApplied = applyDraftToNormalized(normalizedBase, workbench, dirty)
+  // B121/R-1：schema 参与形态仲裁（multiple 语义），单值槽不再被误包成数组
+  const normalizedApplied = applyDraftToNormalized(normalizedBase, workbench, dirty, schema)
   const writeDirty = dirtyForWrite(normalizedApplied, dirty)
   let savedJson: Record<string, unknown>
   try {
@@ -671,7 +672,8 @@ async function commitCreateRecipe(req: CommitRecipeRequest, deps: CommitDeps = {
     source: { source: 'datapack', sourcePath: '' }
   }).normalized
   const dirty = Object.keys(req.workbench.values).filter((k) => typeof k === 'string' && k.length > 0)
-  const normalizedApplied = applyDraftToNormalized(normalizedBase, req.workbench, dirty)
+  // B121/R-1：create 分支同样传 schema 参与形态仲裁
+  const normalizedApplied = applyDraftToNormalized(normalizedBase, req.workbench, dirty, schema)
   const writeDirty = dirtyForWrite(normalizedApplied, dirty)
 
   let savedJson: Record<string, unknown>

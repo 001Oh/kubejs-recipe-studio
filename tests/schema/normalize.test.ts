@@ -203,22 +203,26 @@ describe('④ 标量类型与数组顺序', () => {
 describe('⑤ 未认领字段的限幅（深度 / 8KB）', () => {
   const schema: NormalizedSchema = { id: 'demo:x', layoutKind: 'custom', slots: [], outputs: [] }
 
-  it('深度超过 3 层只保留骨架，标 truncatedDepth', () => {
+  it('深度超过 3 层标 truncatedDepth，原始值随条目保留（B121/S-1：骨架只用于体积估算）', () => {
     const raw = { type: 'demo:x', deep: { a: { b: { c: { d: 1 } } } } }
     const { normalized, diagnostics } = normalizeRecipe({ raw, schema, uid: 'u', source: { source: 'jar', sourcePath: 'p' } })
     const deep = normalized.unknowns.find((u) => u.path === '$.deep')
     expect(deep?.truncatedDepth).toBe(true)
+    // B121/S-1：value 保存原始子树（struct 脏写回写时原样带回，绝不写骨架进配方文件）
+    expect(deep?.value).toEqual(raw.deep)
     expect(normalized.partial.reasons).toContain('unknowns-truncated')
     expect(diagnostics.some((d) => d.code === 'UNKNOWN_TRUNCATED')).toBe(true)
     // 原始数据仍然完整
     expect((normalized.source.raw as Record<string, unknown>)['deep']).toEqual(raw.deep)
   })
 
-  it('单条超过 8KB 不展开、不误标 parse-failed，原文保留', () => {
+  it('单条超过 8KB 标 truncatedBytes、value 保原文、不误标 parse-failed', () => {
     const raw = { type: 'demo:x', blob: 'x'.repeat(10 * 1024) }
     const { normalized, diagnostics } = normalizeRecipe({ raw, schema, uid: 'u', source: { source: 'jar', sourcePath: 'p' } })
     const blob = normalized.unknowns.find((u) => u.path === '$.blob')
-    expect(blob?.value).toBeUndefined()
+    // B121/S-1：此前 value=undefined（struct 回写静默丢键）；现在保存原始值 + truncatedBytes 标记
+    expect(blob?.value).toBe(raw.blob)
+    expect(blob?.truncatedBytes).toBe(true)
     expect(blob?.bytes).toBeGreaterThan(8 * 1024)
     expect(blob?.reason).toBe('not-in-schema')
     expect(normalized.partial.reasons).toContain('unknowns-truncated')

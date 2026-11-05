@@ -5,7 +5,7 @@
  *   RawSource（不可变原始） → NormalizedRecipe（按 schema 规范化 + 未认领字段保留） → RecipeDraft（编辑态，见 draftState.ts）
  * 现有 `RecipeRecord` 摘要与 `SlotValue` 编辑槽位保持不变；这里是为后续生成器准备的新模型。
  */
-import type { FieldKind, LayoutKind } from './types'
+import type { FieldKind, LayoutKind, ModifierSchema, RequirementSpec } from './types'
 
 /** 钉住 schema / schemas.json 的存储格式版本（形状变化才 +1） */
 export const SCHEMA_FORMAT_VERSION = 2
@@ -136,11 +136,16 @@ export type UnknownReason = 'not-in-schema' | 'ambient-condition' | 'dynamic'
 export interface UnknownField {
   /** JSON 路径，数组用 [i]，如 $.secondaries[0].chance */
   path: string
-  /** 展开后的值；超字节上限时为 undefined（原始数据仍在 RawSource） */
+  /**
+   * 条目的原始值（B121/S-1 起一律保存原文，不再置 undefined）——
+   * 展示层用限幅视图，反解（struct 回写）用原始值保真；RawSource.raw 仍另存完整原文。
+   */
   value?: unknown
   reason: UnknownReason
-  /** 是否因深度上限被截断（保留结构骨架，深层只留类型名） */
+  /** 是否因深度上限被截断（深层只留类型骨架，用于展示估算） */
   truncatedDepth?: boolean
+  /** 是否因超出单条字节数上限被截断（与 truncatedDepth 互不蕴含） */
+  truncatedBytes?: boolean
   /** 展开字节数（超过 UNKNOWN_EXPAND_MAX_BYTES 时只记数字） */
   bytes?: number
 }
@@ -213,6 +218,23 @@ export interface NormalizedSchemaSlot {
   fields?: NormalizedSchemaSlot[]
   /** 反解时把 compound 键写回哪一层：'sibling'（父对象，默认）或 'inner'（值对象内部） */
   compoundPlacement?: 'sibling' | 'inner'
+  /**
+   * B121/S-2：以下为「声明侧（L0 SlotInit / 插件槽位）→ 注册表 → 规范化视图」必须
+   * 全链透传的语义字段。此前 convSlot/slotOf 各丢一批，L0 精校声明到达编辑器时只剩骨架。
+   */
+  /** 视觉区（与 RecipeSlotSchema.zone 同义）；缺省由装配方按 slots/outputs 归位 */
+  zone?: 'input' | 'output' | 'extra'
+  role?: 'requirement' | 'input' | 'output' | 'extra'
+  /** 语法糖能否表达该字段（false + 用户填值 → 通道降级） */
+  sugarSupported?: boolean
+  choices?: { value: string; label: string; color?: string }[]
+  defaultValue?: unknown
+  /** 首项固定约束（AE2 transform 等） */
+  firstItemMust?: string
+  orientation?: 'vertical' | 'horizontal'
+  description?: string
+  /** 构造期精确措辞（仅 L0 内部使用，物化后由 displayName 消费） */
+  label?: string
 }
 
 export interface NormalizedSchema {
@@ -224,6 +246,19 @@ export interface NormalizedSchema {
   preserveUnknown?: boolean
   /** 产物是否支持概率字段（仅影响试点 UI 的展示，不改变规范化规则） */
   supportsChance?: boolean
+  /**
+   * B121/S-2：schema 级声明（原 SchemaInit 独有），物化时透传、装配时还原到
+   * RecipeTypeSchema——emit 是语法糖目标的唯一 L0 来源，此前被 materializeRaw 丢弃。
+   */
+  /** 语法糖目标（`event.recipes.<ns>.<method>`）；null = 明确无糖，不得回落 VANILLA_TARGETS */
+  emit?: string | null
+  modifiers?: ModifierSchema[]
+  requirements?: RequirementSpec[]
+  notes?: string[]
+  grid?: { rows: number; cols: number; maxRows?: number; maxCols?: number }
+  /** custom 布局的格子坐标数组 */
+  cells?: { key: string; row: number; col: number }[]
+  docUrl?: string
 }
 
 export type DiagnosticCode =

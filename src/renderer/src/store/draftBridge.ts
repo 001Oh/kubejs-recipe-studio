@@ -200,7 +200,8 @@ export function draftPreview(draft: LoadedDraft): DraftPreview {
       dirtyFields: []
     }
   }
-  const normalized = applyDraftToNormalized(draft.normalized, draft.workbench, draft.meta.dirtyFields)
+  // B121/R-1：schema 参与形态仲裁（multiple 语义），预览与提交共用同一套单值/数组规则
+  const normalized = applyDraftToNormalized(draft.normalized, draft.workbench, draft.meta.dirtyFields, draft.schema)
   // 反解按「规范化槽位名」执行：UI 的 outputs 在单产物草稿里对应 result
   const dirtyForWrite = draft.meta.dirtyFields.map((key) =>
     key === BENCH_OUTPUTS_KEY && !normalized.slots.some((s) => s.key === BENCH_OUTPUTS_KEY) && normalized.slots.some((s) => s.key === 'result')

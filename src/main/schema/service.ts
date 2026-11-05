@@ -54,6 +54,7 @@ import {
   setFactsProvider,
   snapshotLayer,
   unpinSchema,
+  withSchemaMutation,
   writeSnapshotStamp
 } from './registry'
 
@@ -63,11 +64,27 @@ function slotOf(source: NormalizedSchemaSlot, zone: 'input' | 'output'): RecipeS
     displayName: displayNameForField(source.key),
     kind: source.kind,
     multiple: source.multiple,
-    zone
+    // B121/S-2：zone 以声明侧为准（L0 的 zone:'extra' 附加区此前被强制覆盖成 input）
+    zone: source.zone ?? zone
   }
   if (source.required) slot.required = true
   if (source.registry) slot.registry = source.registry
   if (source.compound && source.compound.length > 0) slot.compound = [...source.compound]
+  // B121/S-2：语义字段透传（compound/emitShape/sugarSupported/choices/约束等此前全部蒸发）
+  if (source.emitShape === 'scalar' || source.emitShape === 'object' || source.emitShape === 'positional') {
+    slot.emitShape = source.emitShape
+  }
+  if (source.sugarSupported !== undefined) slot.sugarSupported = source.sugarSupported
+  if (source.choices) slot.choices = source.choices.map((c) => ({ ...c }))
+  if (source.defaultValue !== undefined) slot.defaultValue = source.defaultValue
+  if (source.firstItemMust !== undefined) slot.firstItemMust = source.firstItemMust
+  if (source.orientation !== undefined) slot.orientation = source.orientation
+  if (source.role !== undefined) slot.role = source.role
+  if (source.description !== undefined) slot.description = source.description
+  if (source.constraints) {
+    if (source.constraints.min !== undefined) slot.min = source.constraints.min
+    if (source.constraints.max !== undefined) slot.max = source.constraints.max
+  }
   if (source.fields && source.fields.length > 0) slot.fields = source.fields.map((f) => slotOf(f, 'input'))
   return slot
 }
@@ -92,8 +109,22 @@ export function pilotToSchema(pilot: NormalizedSchema): RecipeTypeSchema {
     channel: 'datapack-json',
     capability: 'compatible'
   }
-  // 语法糖目标只从既有映射里查（原版 7 种），查不到就保持 null，由 capability 判定如实标注
-  base.emitTarget = resolveSugarTarget(base)
+  // B121/S-2：schema 级声明还原。emit===null 是「明确无糖」，不得回落 VANILLA_TARGETS
+  //（SchemaInit 契约：null → event.custom / 数据包 JSON）；undefined 才走原版映射兜底。
+  if (pilot.emit === null) {
+    base.emitTarget = null
+  } else if (pilot.emit !== undefined) {
+    base.emitTarget = resolveSugarTarget({ ...base, emitTarget: pilot.emit })
+  } else {
+    base.emitTarget = resolveSugarTarget(base)
+  }
+  if (pilot.supportsChance) base.supportsChance = true
+  if (pilot.modifiers) base.modifiers = pilot.modifiers
+  if (pilot.requirements) base.requirements = pilot.requirements
+  if (pilot.notes) base.notes = [...pilot.notes]
+  if (pilot.grid) base.grid = pilot.grid
+  if (pilot.cells) base.cells = pilot.cells
+  if (pilot.docUrl) base.docUrl = pilot.docUrl
   return base
 }
 
@@ -146,7 +177,7 @@ export async function ensureSchemas(): Promise<void> {
       await inflight
       continue
     }
-    const task = (async (): Promise<void> => {
+    const task = withSchemaMutation(async (): Promise<void> => {
       // RV1-003：clearSchemas 会把插件层一并清空，所以先快照；provider 失败时恢复快照，
       // 而不是让一次「读取插件失败」变成「所有插件类型消失」
       const prevPluginLayer = snapshotLayer('plugin')
@@ -168,7 +199,7 @@ export async function ensureSchemas(): Promise<void> {
       // 于是 FIX-02 在 provider（`currentRecords`）里的失败重试条件永远走不到——
       // 插件目录恢复后也就无法自动恢复。
       if (pluginLayer.ok && getPluginLoadStatus().state !== 'failed') writeSnapshotStamp(key)
-    })()
+    })
     inflight = task
     try {
       await task

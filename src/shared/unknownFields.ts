@@ -3,8 +3,10 @@
  *
  * 规则（与用户决策一致）：
  * - 常规展开最多 3 层，单条展开后最多 8KB；
- * - 超限只截断「展开结构」，**原始数据仍完整保存在 RawSource**，不会丢；
- * - 超限原因单独记录（truncatedDepth / 超字节 → value=undefined），不得误标为 parse-failed；
+ * - 超限只截断「展开结构」用于展示与体积控制；`value` 一律保存**原始值**——
+ *   原始数据既完整保存在 RawSource.raw，也随本条目随身携带，反解（denormalize
+ *   的 struct 回写）才能原样带回，不会把骨架/空值写进配方文件（B121/S-1）；
+ * - 超限原因单独记录（truncatedDepth / truncatedBytes），不得误标为 parse-failed；
  * - 环境类条件（conditions / research 等）单独标 reason，便于 partial 归因。
  */
 import {
@@ -26,7 +28,7 @@ interface Shrunk {
   truncatedDepth?: boolean
 }
 
-/** 按层数截断；超深处的容器只留类型骨架，标量原样保留 */
+/** 按层数截断；超深处的容器只留类型骨架，标量原样保留（骨架仅用于体积估算） */
 function shrink(value: unknown, depthLeft: number): Shrunk {
   if (Array.isArray(value)) {
     if (depthLeft <= 0) return { truncatedDepth: true, value: { __type: 'array', length: value.length } }
@@ -78,14 +80,15 @@ export function collectUnknownFields(
     const shrunk = shrink(value, maxDepth)
     const bytes = shrunk.value === undefined ? 0 : jsonByteLength(shrunk.value)
     if (bytes > maxBytes) {
-      // 只截断展开结构：保留路径、字节数与截断标记；原文在 RawSource.raw 里
-      out.push({ path, reason: unknownReasonFor(path), bytes, truncatedDepth: shrunk.truncatedDepth })
+      // 超字节：value 保存原始值（不再置 undefined）——struct 回写时才能原样带回；
+      // truncatedBytes 单独标记超限原因，诊断与 partial 归因据此触发
+      out.push({ path, reason: unknownReasonFor(path), value, bytes, truncatedBytes: true })
       continue
     }
     out.push({
       path,
       reason: unknownReasonFor(path),
-      value: shrunk.value,
+      value,
       bytes,
       ...(shrunk.truncatedDepth ? { truncatedDepth: true } : {})
     })

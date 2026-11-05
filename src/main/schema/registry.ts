@@ -371,6 +371,23 @@ async function persistPinned(): Promise<void> {
 }
 
 /**
+ * B121/S-3：schema 变更互斥。pin/unpin 的「内存 set → await 写盘」窗口与 ensureSchemas
+ * 重建的「clearSchemas（清空 pinned）→ loadPinned（读旧盘）」窗口重叠时，用户的钉住会
+ * 从内存消失，且后续任意 persistPinned 会把不含它的列表整体写盘（静默永久删除）。
+ * 三条路径（pin/unpin/重建）统一串行化后，重叠不再可能。锁内不得再取锁（无重入）。
+ */
+let mutationChain: Promise<unknown> = Promise.resolve()
+
+export function withSchemaMutation<T>(fn: () => Promise<T>): Promise<T> {
+  const run = mutationChain.then(fn)
+  mutationChain = run.then(
+    () => undefined,
+    () => undefined
+  )
+  return run
+}
+
+/**
  * 钉住：写入 customTypesFile，之后该类型不再被插件 / L1 / L2 覆盖（规格 3.6.4）。
  *
  * BUG-HUNT-02-RV1 修复 RV1-001：**先改内存、后写盘，写盘失败必须回滚内存**。
@@ -379,43 +396,47 @@ async function persistPinned(): Promise<void> {
  * 重启后又静默回退到磁盘里的旧状态，用户会看到"我明明钉过又没了"。
  */
 export async function pinSchema(schema: RecipeTypeSchema): Promise<RecipeTypeSchema> {
-  const next: RecipeTypeSchema = { ...schema, pinned: true, source: 'custom' }
-  const prevPinned = pinned.get(next.id)
-  const prevEffective = effective.get(next.id)
-  pinned.set(next.id, next)
-  effective.set(next.id, next)
-  try {
-    await persistPinned()
-  } catch (err) {
-    // 回滚到调用前的内存状态，保证「内存 == 磁盘」
-    if (prevPinned) pinned.set(next.id, prevPinned)
-    else pinned.delete(next.id)
-    if (prevEffective) effective.set(next.id, prevEffective)
-    else effective.delete(next.id)
-    logger.error('SCHEMA', `钉住 ${next.id} 写盘失败，已回滚内存状态`, err instanceof Error ? err.message : String(err))
-    throw err
-  }
-  logger.info('SCHEMA', `已钉住配方类型 ${next.id}（写入 customRecipeTypes.json，后续扫描不再覆盖）`)
-  return next
+  return withSchemaMutation(async () => {
+    const next: RecipeTypeSchema = { ...schema, pinned: true, source: 'custom' }
+    const prevPinned = pinned.get(next.id)
+    const prevEffective = effective.get(next.id)
+    pinned.set(next.id, next)
+    effective.set(next.id, next)
+    try {
+      await persistPinned()
+    } catch (err) {
+      // 回滚到调用前的内存状态，保证「内存 == 磁盘」
+      if (prevPinned) pinned.set(next.id, prevPinned)
+      else pinned.delete(next.id)
+      if (prevEffective) effective.set(next.id, prevEffective)
+      else effective.delete(next.id)
+      logger.error('SCHEMA', `钉住 ${next.id} 写盘失败，已回滚内存状态`, err instanceof Error ? err.message : String(err))
+      throw err
+    }
+    logger.info('SCHEMA', `已钉住配方类型 ${next.id}（写入 customRecipeTypes.json，后续扫描不再覆盖）`)
+    return next
+  })
 }
 
-/** 取消钉住：同样先改内存后写盘，失败时回滚（见 pinSchema 的说明）。 */
+/** 取消钉住：同样先改内存后写盘，失败时回滚（见 pinSchema 的说明）；与重建共用变更互斥。 */
 export async function unpinSchema(typeId: string): Promise<boolean> {
-  const prevPinned = pinned.get(typeId)
-  const prevEffective = effective.get(typeId)
-  if (!prevPinned) return false
-  pinned.delete(typeId)
-  try {
-    await persistPinned()
-  } catch (err) {
-    pinned.set(typeId, prevPinned)
-    if (prevEffective) effective.set(typeId, prevEffective)
-    logger.error('SCHEMA', `取消钉住 ${typeId} 写盘失败，已回滚内存状态`, err instanceof Error ? err.message : String(err))
-    throw err
-  }
-  effective.delete(typeId)
-  logger.info('SCHEMA', `已取消钉住 ${typeId}，恢复由插件 / L0 / L2 / L1 合并结果接管`)
-  return true
+  return withSchemaMutation(async () => {
+    const prevPinned = pinned.get(typeId)
+    const prevEffective = effective.get(typeId)
+    if (!prevPinned) return false
+    pinned.delete(typeId)
+    try {
+      await persistPinned()
+    } catch (err) {
+      pinned.set(typeId, prevPinned)
+      if (prevEffective) effective.set(typeId, prevEffective)
+      logger.error('SCHEMA', `取消钉住 ${typeId} 写盘失败，已回滚内存状态`, err instanceof Error ? err.message : String(err))
+      throw err
+    }
+    effective.delete(typeId)
+    logger.info('SCHEMA', `已取消钉住 ${typeId}，恢复由插件 / L0 / L2 / L1 合并结果接管`)
+    return true
+  })
 }
 
 export function pinnedIds(): string[] {
