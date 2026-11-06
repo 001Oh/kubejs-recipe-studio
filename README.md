@@ -57,7 +57,7 @@ Electron 二进制下载走国内镜像时加 `export ELECTRON_MIRROR="https://n
 | 已接线 | `scanSession` 的 `recordIcon` / `startScanSession` / `endScanSession` | 扫描编排使用 |
 | 预留未接线 | `src/data/recipeTypes/`（6 文件，672 行） | 「L0 内置类型库」无任何生产引用，不产出数据 |
 | 预留未接线 | `src/shared/schemaValidate.ts`（225 行） | 引用/数量/概率诊断层，仅 tests 引用；钉住校验在 schemaHandlers 另有实现 |
-| 预留未接线 | `src/shared/schemaMigrate.ts`（127 行） | 迁移层未接线；customRecipeTypes.json 走 loadPinned 直读路径 |
+| 已移除（D-49.6） | `src/shared/schemaMigrate.ts` | 迁移层已随 `191348d` 删除；`customRecipeTypes.json` 走 `loadPinned` 直读路径，无需迁移 |
 | 预留未接线 | `scanSession` 的 `cleanupScanSession` / `recordCacheFile` | 「取消时清理」未接线（取消路径按 A 方案保留产物），能力供缓存管理复用 |
 | 预留未接线 | `views/bench/layouts/`（6 文件：BenchLayout、ShapedGrid、ZoneBoard、CustomGrid、SequenceEditor、ZoneShell） | 通用 schema 编辑器布局层 |
 | 预留未接线 | `views/bench/controls/`（9 文件：ComplexControls、controlProps、FieldControl、FieldShell、ItemControls、KeyValueEditor、RefControls、RegistryControl、ScalarControls） | 通用控件层（useSlotBinding 已接线，见上） |
