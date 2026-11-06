@@ -104,8 +104,8 @@ function scriptRequest(): WriteRequest {
 }
 
 describe('E-1 writer 端：junction 写穿被拒且包外零新增', () => {
-  it('kubejs/server_scripts 是指向包外的 junction → 脚本通道拒写，包外零新增', async () => {
-    if (!linksOk) return
+  it('kubejs/server_scripts 是指向包外的 junction → 脚本通道拒写，包外零新增', async ({ skip }) => {
+    if (!linksOk) skip()
     await fsp.mkdir(join(packRoot, 'kubejs'), { recursive: true })
     await makeJunction(outside, join(packRoot, 'kubejs', 'server_scripts'))
 
@@ -121,8 +121,8 @@ describe('E-1 writer 端：junction 写穿被拒且包外零新增', () => {
     expect(await fsp.readdir(outside)).toEqual([])
   })
 
-  it('kubejs/data/demo/recipes 是 junction + 包外已有同名文件 + 已确认覆盖 → backupExisting 先拒，包外连 .backup 都不出现', async () => {
-    if (!linksOk) return
+  it('kubejs/data/demo/recipes 是 junction + 包外已有同名文件 + 已确认覆盖 → backupExisting 先拒，包外连 .backup 都不出现', async ({ skip }) => {
+    if (!linksOk) skip()
     const original = '{\n  "type": "minecraft:smelting"\n}\n'
     await fsp.writeFile(join(outside, 'evil.json'), original, 'utf8')
     await fsp.mkdir(join(packRoot, 'kubejs', 'data', 'demo'), { recursive: true })
