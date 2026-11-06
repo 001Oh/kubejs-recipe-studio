@@ -279,6 +279,22 @@ export interface InvokeMap {
     res: { revealed: boolean; path: string; relativePath: string }
   }
   'logs:export': { req: { entries: LogEntry[] }; res: { path: string } }
+  'backup:list': {
+    req: { modpackPath?: string } | undefined
+    res: { entries: { file: string; target: string; atMs: number; bytes: number; sha256: string; exists: boolean }[] }
+  }
+  'backup:restore': {
+    req: { backupFile: string; dryRun?: boolean }
+    res: {
+      target: string
+      before: string
+      after: string | null
+      undoBackup: string | null
+      bytes: number
+      dryRun: boolean
+      restored: boolean
+    }
+  }
 }
 
 export type InvokeName = keyof InvokeMap
@@ -338,7 +354,9 @@ export const INVOKE_CHANNELS = [
   'scripts:list',
   'scripts:rename',
   'source:reveal',
-  'logs:export'
+  'logs:export',
+  'backup:list',
+  'backup:restore',
 ] as const satisfies readonly InvokeName[]
 
 export const EVENT_CHANNEL = 'studio:event'

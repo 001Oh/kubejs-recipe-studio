@@ -10,6 +10,7 @@ import { call, callOrThrow, callRaw } from '../api'
 import { useAppStore } from '../store/appStore'
 import { Icon } from '../components/Icon'
 import { CachePanel } from '../components/CachePanel'
+import { BackupPanel } from '../components/BackupPanel'
 import { EDIT_ENTRIES, MODE_NOTES } from './bench/editModes'
 import { THEMES, THEME_LIST } from '@shared/theme'
 import './views.css'
@@ -364,6 +365,8 @@ export function SettingsView(): JSX.Element {
         </section>
 
         <CachePanel />
+
+        <BackupPanel />
 
         <section className="set-card">
           <header className="set-head">

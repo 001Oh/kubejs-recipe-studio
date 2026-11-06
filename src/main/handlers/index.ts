@@ -11,6 +11,7 @@ import { registerPluginHandlers } from './pluginHandlers'
 import { registerRecipeHandlers } from './recipeHandlers'
 import { registerScanHandlers } from './scanHandlers'
 import { registerCacheHandlers } from './cacheHandlers'
+import { registerBackupHandlers } from './backupHandlers'
 import { registerSchemaHandlers } from './schemaHandlers'
 import { registerSourceHandlers } from './sourceHandlers'
 
@@ -21,6 +22,7 @@ export function registerHandlers(): void {
   registerRecipeHandlers()
   registerScanHandlers()
   registerCacheHandlers()
+  registerBackupHandlers()
   registerItemsHandlers()
   // 第 115 批续：在资源管理器中定位源文件（只接受 uid，路径由主进程解析并做越界校验）
   registerSourceHandlers()
